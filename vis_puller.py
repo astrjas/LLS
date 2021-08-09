@@ -1,9 +1,18 @@
+import numpy as np
+
+#Speed of light
 c=3.0e8
-datams='firstintflag_M87.ms'
+
+#Data file visibilities will be pulled from
+datams='sgr_apr07_flagcor_fiveant.ms'
 #print(datams[:-3])
 ms.open(datams,nomodify=True)
+
+#Collect data from ms
 visdata = ms.getdata(['uvw','antenna1','antenna2','data','sigma','data_desc_id'])
+print(visdata['data'].shape)
 visdata['data'] = np.squeeze(visdata['data'])
+print(visdata['data'].shape)
 ms.close()
 tb.open(datams+'/SPECTRAL_WINDOW')
 freqs = np.squeeze(tb.getcol('CHAN_FREQ'))
@@ -15,7 +24,7 @@ tb.open(datams+'/ANTENNA')
 diam = np.squeeze(tb.getcol('DISH_DIAMETER'))[0] # assumes all dishes are equal size
 tb.close()
 PBfwhm = 1.2*(c/np.mean(freqs))/diam * (3600*180/np.pi) # in arcsec
-print("Shape [:,0,:]: "+str(visdata['data'][:,0,:].shape))
+print("Shape [:,:]: "+str(visdata['data'].shape))
 print("Shape vd[sigma]: "+str(visdata['sigma'].shape))
 # Current data+sigma has two pols, average them.
 newlist = [np.average(visdata['data'][:,x,:],weights=(visdata['sigma']**-2.),axis=0) for x in range(len(visdata['data'][0,:,0]))]
@@ -51,12 +60,17 @@ for ant1 in np.unique(visdata['antenna1']):
                 diffrs = reals - np.roll(reals,-1); diffis = imags - np.roll(imags,-1)
                 std = np.mean([diffrs.std(),diffis.std()])
                 facs.append(std/sigs.mean()/np.sqrt(2)) # for calculating a single rescaling
+                
 
-
+phases=np.angle(visdata['data'])
 facs = np.asarray(facs)
 print(facs.shape)
 visdata['sigma'] *= facs.mean()
-print datams, facs.mean(), ((visdata['sigma']**-2).sum())**-0.5
+#print datams, facs.mean(), ((visdata['sigma']**-2).sum())**-0.5
+
+print(phases)
+
+'''
 datams_new=datams[:-3]+'_altered.ms'
 os.system('rm -rf '+datams_new)
 split(vis=datams,outputvis=datams_new,datacolumn='data')
@@ -67,3 +81,4 @@ replace['sigma'] *= facs.mean()
 replace['weight'] = replace['sigma']**-2.
 ms.putdata(replace)
 ms.close()
+'''
