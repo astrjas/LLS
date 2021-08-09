@@ -27,17 +27,16 @@ PBfwhm = 1.2*(c/np.mean(freqs))/diam * (3600*180/np.pi) # in arcsec
 print("Shape [:,:]: "+str(visdata['data'].shape))
 print("Shape vd[sigma]: "+str(visdata['sigma'].shape))
 # Current data+sigma has two pols, average them.
-newlist = [np.average(visdata['data'][:,x,:],weights=(visdata['sigma']**-2.),axis=0) for x in range(len(visdata['data'][0,:,0]))]
+np.average(visdata['data'],weights=(visdata['sigma']**-2.),axis=0)
 print("bingo, ho hoh ho hoh")
 #print(len(newlist))
-visdata['data']=np.asarray(newlist)
 print("New visdata shape: "+str(visdata['data'].shape))
 #visdata['data'] = np.average(visdata['data'],weights=(visdata['sigma']**-2.),axis=0)
 visdata['sigma'] = np.sum((visdata['sigma']**-2.),axis=0)**-0.5 # these are uncertainties, average them down
 
 # Convert uvw coords from m to wavelengths
 freqyc=freqs/c
-newvis=[visdata['uvw'] * freqs[x,y]/c for x in range(len(freqs[:,0])) for y in range(len(freqs[0,:]))]
+newvis=[visdata['uvw'] * freqs[x]/c for x in range(len(freqs))]
 newvis1=np.asarray(newvis)
 print("uvw coords array:",newvis1.shape)
 
@@ -69,6 +68,7 @@ visdata['sigma'] *= facs.mean()
 #print datams, facs.mean(), ((visdata['sigma']**-2).sum())**-0.5
 
 print(phases)
+print("Phase shapes:"+str(phases.shape))
 
 '''
 datams_new=datams[:-3]+'_altered.ms'
