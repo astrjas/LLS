@@ -71,7 +71,7 @@ visdata['sigma'] *= facs.mean()
 print(phases)
 print("Phase shapes:"+str(phases.shape))
 
-'''
+
 datams_new=datams[:-3]+'_altered.ms'
 os.system('rm -rf '+datams_new)
 split(vis=datams,outputvis=datams_new,datacolumn='data')
@@ -82,4 +82,4 @@ replace['sigma'] *= facs.mean()
 replace['weight'] = replace['sigma']**-2.
 ms.putdata(replace)
 ms.close()
-'''
+
