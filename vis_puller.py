@@ -4,7 +4,7 @@ import numpy as np
 c=3.0e8
 
 #Data file visibilities will be pulled from
-datams='sgr_apr07_flagcor_fiveant.ms'
+datams='sgr_apr07_flagcor_tenbaseline.ms'
 #print(datams[:-3])
 ms.open(datams,nomodify=True)
 
@@ -16,6 +16,7 @@ print(visdata['data'].shape)
 ms.close()
 tb.open(datams+'/SPECTRAL_WINDOW')
 freqs = np.squeeze(tb.getcol('CHAN_FREQ'))
+print(freqs)
 print("Freq shape: "+str(freqs.shape))
 tb.close()
 
