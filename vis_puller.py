@@ -62,7 +62,7 @@ for ant1 in np.unique(visdata['antenna1']):
                 facs.append(std/sigs.mean()/np.sqrt(2)) # for calculating a single rescaling
                 
 
-phases=np.angle(visdata['data'])
+phases=np.angle(visdata['data'],deg=True)
 facs = np.asarray(facs)
 print(facs.shape)
 visdata['sigma'] *= facs.mean()
