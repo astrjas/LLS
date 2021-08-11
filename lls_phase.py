@@ -87,16 +87,28 @@ for ant1 in np.unique(visdata['antenna1']):
                 std = np.mean([diffrs.std(),diffis.std()])
                 facs.append(std/sigs.mean()/np.sqrt(2)) # for calculating a single rescaling
                 '''
-print(Theta_r)
-print(theta_m)
+
+t1=np.linalg.inv(np.matmul(Theta_r.T,Theta_r))
+t2=np.matmul(t1,Theta_r.T)
+theta_Ir=np.matmul(t2,theta_m)
+
+print(theta_Ir)
+
+#Residuals
+theta_del=theta_m-np.matmul(Theta_r,theta_Ir)
+
+print(theta_del)
+
+#print(Theta_r)
+#print(theta_m)
 
 
-phases=np.angle(visdata['data'],deg=True)
+#phases=np.angle(visdata['data'],deg=True)
 #facs = np.asarray(facs)
 #print(facs.shape)
 #visdata['sigma'] *= facs.mean()
 #print datams, facs.mean(), ((visdata['sigma']**-2).sum())**-0.5
 
-print(phases)
-print("Phase shapes:"+str(phases.shape))
+#print(phases)
+#print("Phase shapes:"+str(phases.shape))
 
