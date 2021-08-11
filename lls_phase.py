@@ -1,5 +1,12 @@
 import numpy as np
 
+def th_Ir(Th_r,th_m):
+    t1=np.linalg.inv(np.matmul(Th_r.T,Th_r))
+    t2=np.matmul(t1,Th_r.T)
+    theta_Ir=np.matmul(t2,th_m)
+    return theta_Ir
+
+
 #Speed of light
 c=3.0e8
 
@@ -9,17 +16,18 @@ datams='sgr_apr07_flagcor_tenbaseline.ms'
 ms.open(datams,nomodify=True)
 
 #Collect data from ms
-visdata = ms.getdata(['uvw','antenna1','antenna2','data','sigma','data_desc_id'])
-print(visdata['data'].shape)
+visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id'])
+#print(visdata['data'].shape)
 visdata['data'] = np.squeeze(visdata['data'])
-print(visdata['data'].shape)
+#print(visdata['data'].shape)
 ms.close()
-tb.open(datams+'/SPECTRAL_WINDOW')
-freqs = np.squeeze(tb.getcol('CHAN_FREQ'))
-print(freqs)
-print("Freq shape: "+str(freqs.shape))
-tb.close()
+#tb.open(datams+'/SPECTRAL_WINDOW')
+#freqs = np.squeeze(tb.getcol('CHAN_FREQ'))
+#print(freqs)
+#print("Freq shape: "+str(freqs.shape))
+#tb.close()
 
+'''
 # Get the primary beam size
 tb.open(datams+'/ANTENNA')
 diam = np.squeeze(tb.getcol('DISH_DIAMETER'))[0] # assumes all dishes are equal size
@@ -40,6 +48,7 @@ freqyc=freqs/c
 newvis=[visdata['uvw'] * freqs[x]/c for x in range(len(freqs))]
 newvis1=np.asarray(newvis)
 print("uvw coords array:",newvis1.shape)
+'''
 
 nant=int(len(np.unique(visdata['antenna2'])))+1
 nbl=int(nant*(nant-1)/2)
@@ -51,14 +60,14 @@ theta_m=np.zeros((nbl,1),dtype=float)
 nb=0
 #print("A1")
 #print(len(visdata['data'][:,0]))
-print("A2")
-print(np.unique(visdata['antenna2']).shape)
+#print("A2")
+#print(np.unique(visdata['antenna2']).shape)
 for ant1 in np.unique(visdata['antenna1']):
     for ant2 in np.unique(visdata['antenna2']):
         if ant1 < ant2:
             thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
             if thisbase.sum()>0:
-                ph=np.angle(visdata['data'][0][thisbase][0],deg=True)
+                ph=np.angle(visdata['data'][0][thisbase][10],deg=True)
                 theta_m[nb]=ph
                 if ant1==0:
                     Theta_r[nb,ant2-1]=-1
@@ -88,9 +97,12 @@ for ant1 in np.unique(visdata['antenna1']):
                 facs.append(std/sigs.mean()/np.sqrt(2)) # for calculating a single rescaling
                 '''
 
-t1=np.linalg.inv(np.matmul(Theta_r.T,Theta_r))
-t2=np.matmul(t1,Theta_r.T)
-theta_Ir=np.matmul(t2,theta_m)
+print(theta_m)
+
+theta_Ir=th_Ir(Th_r=Theta_r,th_m=theta_m)
+#t1=np.linalg.inv(np.matmul(Theta_r.T,Theta_r))
+#t2=np.matmul(t1,Theta_r.T)
+#theta_Ir=np.matmul(t2,theta_m)
 
 print(theta_Ir)
 
@@ -98,6 +110,14 @@ print(theta_Ir)
 theta_del=theta_m-np.matmul(Theta_r,theta_Ir)
 
 print(theta_del)
+
+theta_Ir_res=th_Ir(Th_r=Theta_r,th_m=theta_del)
+
+print(theta_Ir_res)
+
+theta_Ir_final=theta_Ir+theta_Ir_res
+
+print(theta_Ir_final)
 
 #print(Theta_r)
 #print(theta_m)
