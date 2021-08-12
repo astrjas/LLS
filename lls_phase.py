@@ -16,8 +16,12 @@ visdata['data'] = np.squeeze(visdata['data'])
 ms.close()
 
 #Calculating number of antennas and baselines
-nant=int(len(np.unique(visdata['antenna2'])))+1
+nant=int(len(np.unique(visdata['antenna1'])))+1
 nbl=int(nant*(nant-1)/2)
+
+print(nant)
+print(nbl)
+print(len(np.unique(visdata['antenna1'])))
 
 #Defining Jacobian and measured phase matrix
 Theta_r=np.zeros((nbl,nant-1),dtype=int)
@@ -26,11 +30,13 @@ theta_m=np.zeros((nbl,1),dtype=float)
 
 #Setting integer for cycling through baselines
 nb=0
-refant=2
+refant=4
 for ant1 in np.unique(visdata['antenna1']):
     for ant2 in np.unique(visdata['antenna2']):
         if ant1 < ant2:
             thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
+            #iant1=np.unique(visdata['antenna1']).index(ant1)
+            #iant2=visdata['antenna1'].index(ant2)
             if thisbase.sum()>0:
                 ph=np.angle(visdata['data'][0][thisbase][10],deg=True)
                 theta_m[nb]=ph
