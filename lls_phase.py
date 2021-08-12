@@ -26,6 +26,7 @@ theta_m=np.zeros((nbl,1),dtype=float)
 
 #Setting integer for cycling through baselines
 nb=0
+refant=2
 for ant1 in np.unique(visdata['antenna1']):
     for ant2 in np.unique(visdata['antenna2']):
         if ant1 < ant2:
@@ -33,13 +34,34 @@ for ant1 in np.unique(visdata['antenna1']):
             if thisbase.sum()>0:
                 ph=np.angle(visdata['data'][0][thisbase][10],deg=True)
                 theta_m[nb]=ph
-                if ant1==0:
-                    Theta_r[nb,ant2-1]=-1
-                if ant1!=0:
+                '''
+                if ant2==4: Theta_r[nb,ant1]=1
+                if ant2!=4:
+                    Theta_r[nb,ant1]=1
+                    Theta_r[nb,ant2]=-1
+                '''
+                if ant1==refant: Theta_r[nb,ant2-1]=-1
+                if ant2==refant: Theta_r[nb,ant1]=1
+                if ant1!=refant and ant1>refant:
                     Theta_r[nb,ant1-1]=1
                     Theta_r[nb,ant2-1]=-1
+                if ant1!=refant and ant2<refant:
+                    Theta_r[nb,ant1]=1
+                    Theta_r[nb,ant2]=-1
+                if (ant1!=refant and (ant2>refant and ant1<refant)):
+                    Theta_r[nb,ant1]=1
+                    Theta_r[nb,ant2-1]=-1
+                    
+
+                
+                #if ant1==0: Theta_r[nb,ant2-1]=-1
+                #if ant1!=0:
+                #    Theta_r[nb,ant1-1]=1
+                #    Theta_r[nb,ant2-1]=-1
+                
                 nb+=1
 
+print("Theta_r \n"+str(Theta_r))
 print("theta_m \n"+str(theta_m))
 
 theta_Ir=th_Ir(Th_r=Theta_r,th_m=theta_m)
