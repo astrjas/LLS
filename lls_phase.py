@@ -10,18 +10,25 @@ def th_Ir(Th_r,th_m):
 datams='sgr_apr07_flagcor_tenbaseline.ms'
 ms.open(datams,nomodify=True)
 
+
 #Collect data from ms
 visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id'])
 visdata['data'] = np.squeeze(visdata['data'])
 ms.close()
 
+allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
+antlist=np.unique(allants)
+#print(antlist)
+
 #Calculating number of antennas and baselines
-nant=int(len(np.unique(visdata['antenna1'])))+1
+nant=int(len(antlist))
 nbl=int(nant*(nant-1)/2)
+
 
 print(nant)
 print(nbl)
-print(len(np.unique(visdata['antenna1'])))
+#print(len(np.unique(visdata['antenna1'])))
+#print(len(np.unique(allants)))
 
 #Defining Jacobian and measured phase matrix
 Theta_r=np.zeros((nbl,nant-1),dtype=int)
@@ -35,8 +42,10 @@ for ant1 in np.unique(visdata['antenna1']):
     for ant2 in np.unique(visdata['antenna2']):
         if ant1 < ant2:
             thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
-            #iant1=np.unique(visdata['antenna1']).index(ant1)
-            #iant2=visdata['antenna1'].index(ant2)
+            iant1=np.where(antlist==ant1)[0]
+            iant2=np.where(antlist==ant2)[0]
+            #print(iant1)
+            #print(iant2)
             if thisbase.sum()>0:
                 ph=np.angle(visdata['data'][0][thisbase][10],deg=True)
                 theta_m[nb]=ph
@@ -46,17 +55,17 @@ for ant1 in np.unique(visdata['antenna1']):
                     Theta_r[nb,ant1]=1
                     Theta_r[nb,ant2]=-1
                 '''
-                if ant1==refant: Theta_r[nb,ant2-1]=-1
-                if ant2==refant: Theta_r[nb,ant1]=1
+                if ant1==refant: Theta_r[nb,iant2-1]=-1
+                if ant2==refant: Theta_r[nb,iant1]=1
                 if ant1!=refant and ant1>refant:
-                    Theta_r[nb,ant1-1]=1
-                    Theta_r[nb,ant2-1]=-1
+                    Theta_r[nb,iant1-1]=1
+                    Theta_r[nb,iant2-1]=-1
                 if ant1!=refant and ant2<refant:
-                    Theta_r[nb,ant1]=1
-                    Theta_r[nb,ant2]=-1
+                    Theta_r[nb,iant1]=1
+                    Theta_r[nb,iant2]=-1
                 if (ant1!=refant and (ant2>refant and ant1<refant)):
-                    Theta_r[nb,ant1]=1
-                    Theta_r[nb,ant2-1]=-1
+                    Theta_r[nb,iant1]=1
+                    Theta_r[nb,iant2-1]=-1
                     
 
                 
