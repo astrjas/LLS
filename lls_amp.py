@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def th_Ir(Th_r,th_m):
-    t1=np.linalg.inv(np.matmul(Th_r.T,Th_r))
-    t2=np.matmul(t1,Th_r.T)
-    theta_Ir=np.matmul(t2,th_m)
-    return theta_Ir
+def l_Ir(ll_r,ll_m):
+    t1=np.linalg.inv(np.matmul(ll_r.T,ll_r))
+    t2=np.matmul(t1,ll_r.T)
+    ll_Ir=np.matmul(t2,ll_m)
+    return ll_Ir
 
 #Data file visibilities will be pulled from
 datams='sgr_apr07_flagcor.ms'
@@ -32,9 +32,9 @@ print(nbl)
 #print(len(np.unique(allants)))
 
 #Defining Jacobian and measured phase matrix
-Theta_r=np.zeros((nbl,nant-1),dtype=int)
-r_size=Theta_r.shape
-theta_m=np.zeros((nbl,1),dtype=float)
+script_L=np.zeros((nbl,nant-1),dtype=int)
+r_size=script_L.shape
+l_m=np.zeros((nbl,1),dtype=float)
 
 #Setting integer for cycling through baselines
 nb=0
@@ -49,24 +49,24 @@ for ant1 in np.unique(visdata['antenna1']):
             #print(iant2)
             if thisbase.sum()>0:
                 amp=np.absolute(visdata['data'][0][thisbase][10])
-                theta_m[nb]=ph
+                l_m[nb]=np.log10(amp)
                 '''
                 if ant2==4: Theta_r[nb,ant1]=1
                 if ant2!=4:
                     Theta_r[nb,ant1]=1
                     Theta_r[nb,ant2]=-1
                 '''
-                if ant1==refant: Theta_r[nb,iant2-1]=-1
-                if ant2==refant: Theta_r[nb,iant1]=1
+                if ant1==refant: script_L[nb,iant2-1]=1
+                if ant2==refant: script_L[nb,iant1]=1
                 if ant1!=refant and ant1>refant:
-                    Theta_r[nb,iant1-1]=1
-                    Theta_r[nb,iant2-1]=-1
+                    script_L[nb,iant1-1]=1
+                    script_L[nb,iant2-1]=1
                 if ant1!=refant and ant2<refant:
-                    Theta_r[nb,iant1]=1
-                    Theta_r[nb,iant2]=-1
+                    script_L[nb,iant1]=1
+                    script_L[nb,iant2]=1
                 if (ant1!=refant and (ant2>refant and ant1<refant)):
-                    Theta_r[nb,iant1]=1
-                    Theta_r[nb,iant2-1]=-1
+                    script_L[nb,iant1]=1
+                    script_L[nb,iant2-1]=1
                     
 
                 
@@ -77,34 +77,38 @@ for ant1 in np.unique(visdata['antenna1']):
                 
                 nb+=1
 
-print("Theta_r \n"+str(Theta_r))
-print("theta_m \n"+str(theta_m))
+print("script_L \n"+str(script_L))
+print("l_m \n"+str(l_m))
 
-theta_Ir=th_Ir(Th_r=Theta_r,th_m=theta_m)
+l_r=l_Ir(ll_r=script_L,ll_m=l_m)
 #t1=np.linalg.inv(np.matmul(Theta_r.T,Theta_r))
 #t2=np.matmul(t1,Theta_r.T)
 #theta_Ir=np.matmul(t2,theta_m)
 
-print("theta_Ir \n"+str(theta_Ir))
+print("l_r \n"+str(l_r))
 
 #Residuals
-theta_del=theta_m-np.matmul(Theta_r,theta_Ir)
+l_del=l_m-np.matmul(script_L,l_r)
 
-print("theta_del \n"+str(theta_del))
+print("l_del \n"+str(l_del))
 
-theta_Ir_res=th_Ir(Th_r=Theta_r,th_m=theta_del)
+l_Ir_res=l_Ir(ll_r=script_L,ll_m=l_del)
 
-print("theta_Ir w/ resids: \n"+str(theta_Ir_res))
+print("l_Ir w/ resids: \n"+str(l_Ir_res))
 
-theta_Ir_final=theta_Ir+theta_Ir_res
+l_Ir_final=l_r+l_Ir_res
 
-print("final phases \n"+str(theta_Ir_final))
+print("final amps (log form) \n"+str(l_Ir_final))
+
+Ir_converted=np.vstack([10.0**x for x in l_Ir_final])
+
+print("final amps (converted) \n"+str(Ir_converted))
 
 bpts=range(nant-1)
-print(len(bpts))
-print(theta_Ir_final[:,0].shape)
+#print(len(bpts))
+#print([:,0].shape)
 
 
-plt.scatter(bpts,theta_Ir_final[:,0])
+plt.scatter(bpts,Ir_converted[:,0])
 plt.show()
 
