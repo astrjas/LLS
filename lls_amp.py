@@ -2,6 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def l_Ir(ll_r,ll_m):
+    print("ll_r")
+    print(ll_r.shape)
+    print("ll_m")
+    print(ll_m.shape)
+    ll_r_T=np.transpose(ll_r,(1,0))
     t1=np.linalg.inv(np.matmul(ll_r.T,ll_r))
     t2=np.matmul(t1,ll_r.T)
     ll_Ir=np.matmul(t2,ll_m)
@@ -38,10 +43,11 @@ print(nbl)
 #print(len(np.unique(allants)))
 
 #Defining Jacobian and measured phase matrix
-script_L=np.zeros((nbl,nant-1,len(ELO)),dtype=int)
+script_L=np.zeros((nbl,nant,len(ELO)),dtype=int)
 r_size=script_L.shape
 l_m=np.zeros((nbl,1,len(ELO)),dtype=float)
 anttrack=np.full(shape=(nbl,2,len(ELO)),fill_value=-1,dtype=int)
+l_r=np.zeros((nbl,1,len(ELO)),dtype=float)
 
 '''
 for ant1 in np.unique(visdata['antenna1']):
@@ -77,18 +83,20 @@ for time in ELO:
                         #print("ah!")
                         continue
                     else:
-                        #print(nb)
-                        #print(amp)
                         l_m[nb,0,itime]=np.log10(amp)
                         anttrack[nb,0,itime]=ant1
                         anttrack[nb,1,itime]=ant2
+
+                        script_L[nb,iant1,itime]=1
+                        script_L[nb,iant2,itime]=1
                         '''
                         if ant2==4: Theta_r[nb,ant1]=1
                         if ant2!=4:
                             Theta_r[nb,ant1]=1
                             Theta_r[nb,ant2]=-1
                         '''
-
+    
+                        '''
                         if ant1==refant: script_L[nb,iant2-1]=1
                         if ant2==refant: script_L[nb,iant1]=1
                         if ant1!=refant and ant1>refant:
@@ -100,20 +108,18 @@ for time in ELO:
                         if (ant1!=refant and (ant2>refant and ant1<refant)):
                             script_L[nb,iant1,itime]=1
                             script_L[nb,iant2-1,itime]=1
-
-
-
-                        #if ant1==0: Theta_r[nb,ant2-1]=-1
-                        #if ant1!=0:
-                        #    Theta_r[nb,ant1-1]=1
-                        #    Theta_r[nb,ant2-1]=-1
+                        '''
+    
 
                     nb+=1
 
 print("script_L \n"+str(script_L))
 print("l_m \n"+str(l_m))
 
-l_r=[l_Ir(ll_r=script_L[:,:,x],ll_m=l_m[:,:,x]) for x in np.where(ELO==x)]
+#print(script_L[:,:,0].shape)
+#print(l_m[:,:,0].shape)
+
+l_r=[l_Ir(ll_r=script_L[:,:,int(x)],ll_m=l_m[:,:,int(x)]) for x in np.where(ELO==x)]
 #t1=np.linalg.inv(np.matmul(Theta_r.T,Theta_r))
 #t2=np.matmul(t1,Theta_r.T)
 #theta_Ir=np.matmul(t2,theta_m)
