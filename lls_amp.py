@@ -5,11 +5,19 @@ def l_Ir(ll_r,ll_m):
     print("ll_r")
     print(ll_r.shape)
     print("ll_m")
-    print(ll_m.shape)
-    ll_r_T=np.transpose(ll_r,(1,0))
+    print(ll_m)
+    #ll_r_T=np.transpose(ll_r,(1,0))
+    t0=np.matmul(ll_r.T,ll_r)
+    #print(t0[np.nonzero(t0)])
     t1=np.linalg.inv(np.matmul(ll_r.T,ll_r))
+    print("t1")
+    print(t1)
     t2=np.matmul(t1,ll_r.T)
+    print("t2")
+    print(t2)
     ll_Ir=np.matmul(t2,ll_m)
+    print("answer!")
+    print(ll_Ir)
     return ll_Ir
 
 #Data file visibilities will be pulled from
@@ -61,10 +69,11 @@ for ant1 in np.unique(visdata['antenna1']):
 #Setting integer for cycling through baselines
 nb=0
 refant=4
+tb=0
 for time in ELO:
     thistime=(visdata['axis_info']['time_axis']['MJDseconds']==time)
     itime=np.where(ELO==time)[0]
-    #print(itime)
+    print(itime)
     nb=0
     for ant1 in np.unique(visdata['antenna1']):
         for ant2 in np.unique(visdata['antenna2']):
@@ -75,12 +84,15 @@ for time in ELO:
                 #print(iant1)
                 #print(iant2)
                 if thisbase.sum()>0:
-                    #print("length!")
-                    #print(visdata['data'][0][thisbase][0][thistime][:])
+                    print("length!")
+                    #print(visdata['data'][0][thisbase][0][thistime][0])
                     pt=visdata['data'][0][thisbase][0][thistime][0]
+                    #print(pt)
                     amp=np.absolute(pt)
+                    print(amp)
                     if amp<=0:
                         #print("ah!")
+                        nb+=1
                         continue
                     else:
                         l_m[nb,0,itime]=np.log10(amp)
@@ -89,29 +101,34 @@ for time in ELO:
 
                         script_L[nb,iant1,itime]=1
                         script_L[nb,iant2,itime]=1
-                        '''
-                        if ant2==4: Theta_r[nb,ant1]=1
-                        if ant2!=4:
-                            Theta_r[nb,ant1]=1
-                            Theta_r[nb,ant2]=-1
-                        '''
-    
-                        '''
-                        if ant1==refant: script_L[nb,iant2-1]=1
-                        if ant2==refant: script_L[nb,iant1]=1
-                        if ant1!=refant and ant1>refant:
-                            script_L[nb,iant1-1,itime]=1
-                            script_L[nb,iant2-1,itime]=1
-                        if ant1!=refant and ant2<refant:
-                            script_L[nb,iant1,itime]=1
-                            script_L[nb,iant2,itime]=1
-                        if (ant1!=refant and (ant2>refant and ant1<refant)):
-                            script_L[nb,iant1,itime]=1
-                            script_L[nb,iant2-1,itime]=1
-                        '''
-    
+                        
+                        nb+=1
+                    '''
+                    if ant2==4: Theta_r[nb,ant1]=1
+                    if ant2!=4:
+                        Theta_r[nb,ant1]=1
+                        Theta_r[nb,ant2]=-1
+                    '''
 
-                    nb+=1
+                    '''
+                    if ant1==refant: script_L[nb,iant2-1]=1
+                    if ant2==refant: script_L[nb,iant1]=1
+                    if ant1!=refant and ant1>refant:
+                        script_L[nb,iant1-1,itime]=1
+                        script_L[nb,iant2-1,itime]=1
+                    if ant1!=refant and ant2<refant:
+                        script_L[nb,iant1,itime]=1
+                        script_L[nb,iant2,itime]=1
+                    if (ant1!=refant and (ant2>refant and ant1<refant)):
+                        script_L[nb,iant1,itime]=1
+                        script_L[nb,iant2-1,itime]=1
+                    '''
+                    
+    script_L_chunk=script_L[:,:,tb]
+    l_m_chunk=l_m[:,:,tb]
+    l_r[:,:,itime]=l_Ir(ll_r=script_L_chunk,ll_m=l_m_chunk)
+    print(str(itime))
+    tb+=1
 
 print("script_L \n"+str(script_L))
 print("l_m \n"+str(l_m))
