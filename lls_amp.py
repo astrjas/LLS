@@ -13,9 +13,12 @@ ms.open(datams,nomodify=True)
 
 
 #Collect data from ms
-visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id'])
+visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id','axis_info'],ifraxis=True)
 visdata['data'] = np.squeeze(visdata['data'])
 ms.close()
+
+print(len(visdata['axis_info']['time_axis']['MJDseconds']))
+print(len(np.unique(visdata['axis_info']['time_axis']['MJDseconds'])))
 
 allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
 antlist=np.unique(allants)
@@ -36,6 +39,13 @@ script_L=np.zeros((nbl,nant-1),dtype=int)
 r_size=script_L.shape
 l_m=np.zeros((nbl,1),dtype=float)
 
+'''
+for ant1 in np.unique(visdata['antenna1']):
+    for ant2 in np.unique(visdata['antenna2']):
+        if ant1 < ant2:
+            thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
+            #print(len(visdata['data'][0][thisbase]))
+
 #Setting integer for cycling through baselines
 nb=0
 refant=4
@@ -48,34 +58,39 @@ for ant1 in np.unique(visdata['antenna1']):
             #print(iant1)
             #print(iant2)
             if thisbase.sum()>0:
-                amp=np.absolute(visdata['data'][0][thisbase][10])
-                l_m[nb]=np.log10(amp)
-                '''
-                if ant2==4: Theta_r[nb,ant1]=1
-                if ant2!=4:
-                    Theta_r[nb,ant1]=1
-                    Theta_r[nb,ant2]=-1
-                '''
-                if ant1==refant: script_L[nb,iant2-1]=1
-                if ant2==refant: script_L[nb,iant1]=1
-                if ant1!=refant and ant1>refant:
-                    script_L[nb,iant1-1]=1
-                    script_L[nb,iant2-1]=1
-                if ant1!=refant and ant2<refant:
-                    script_L[nb,iant1]=1
-                    script_L[nb,iant2]=1
-                if (ant1!=refant and (ant2>refant and ant1<refant)):
-                    script_L[nb,iant1]=1
-                    script_L[nb,iant2-1]=1
-                    
+                nb=0
+                for pt in np.arange(len(visdata['data'][0][thisbase])):
+                    #print(len(visdata['data'][0][thisbase]))
+                    amp=np.absolute(visdata['data'][0][thisbase][pt])
+                    l_m[nb]=np.log10(amp)
+                    '''
+'''
+                    if ant2==4: Theta_r[nb,ant1]=1
+                    if ant2!=4:
+                        Theta_r[nb,ant1]=1
+                        Theta_r[nb,ant2]=-1
+                    '''
+'''
+                    if ant1==refant: script_L[nb,iant2-1]=1
+                    if ant2==refant: script_L[nb,iant1]=1
+                    if ant1!=refant and ant1>refant:
+                        script_L[nb,iant1-1]=1
+                        script_L[nb,iant2-1]=1
+                    if ant1!=refant and ant2<refant:
+                        script_L[nb,iant1]=1
+                        script_L[nb,iant2]=1
+                    if (ant1!=refant and (ant2>refant and ant1<refant)):
+                        script_L[nb,iant1]=1
+                        script_L[nb,iant2-1]=1
 
-                
-                #if ant1==0: Theta_r[nb,ant2-1]=-1
-                #if ant1!=0:
-                #    Theta_r[nb,ant1-1]=1
-                #    Theta_r[nb,ant2-1]=-1
-                
-                nb+=1
+
+
+                    #if ant1==0: Theta_r[nb,ant2-1]=-1
+                    #if ant1!=0:
+                    #    Theta_r[nb,ant1-1]=1
+                    #    Theta_r[nb,ant2-1]=-1
+
+                    nb+=1
 
 print("script_L \n"+str(script_L))
 print("l_m \n"+str(l_m))
@@ -112,3 +127,4 @@ bpts=range(nant-1)
 plt.scatter(bpts,Ir_converted[:,0])
 plt.show()
 
+'''
