@@ -20,6 +20,9 @@ ms.close()
 print(len(visdata['axis_info']['time_axis']['MJDseconds']))
 print(len(np.unique(visdata['axis_info']['time_axis']['MJDseconds'])))
 
+ELO=np.unique(visdata['axis_info']['time_axis']['MJDseconds'])
+print(ELO)
+
 allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
 antlist=np.unique(allants)
 #print(antlist)
@@ -35,9 +38,9 @@ print(nbl)
 #print(len(np.unique(allants)))
 
 #Defining Jacobian and measured phase matrix
-script_L=np.zeros((nbl,nant-1),dtype=int)
+script_L=np.zeros((nbl,nant-1,len(ELO)),dtype=int)
 r_size=script_L.shape
-l_m=np.zeros((nbl,1),dtype=float)
+l_m=np.zeros((nbl,len(ELO)),dtype=float)
 
 '''
 for ant1 in np.unique(visdata['antenna1']):
@@ -45,50 +48,62 @@ for ant1 in np.unique(visdata['antenna1']):
         if ant1 < ant2:
             thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
             #print(len(visdata['data'][0][thisbase]))
+'''
+
 
 #Setting integer for cycling through baselines
 nb=0
 refant=4
-for ant1 in np.unique(visdata['antenna1']):
-    for ant2 in np.unique(visdata['antenna2']):
-        if ant1 < ant2:
-            thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
-            iant1=np.where(antlist==ant1)[0]
-            iant2=np.where(antlist==ant2)[0]
-            #print(iant1)
-            #print(iant2)
-            if thisbase.sum()>0:
-                nb=0
-                for pt in np.arange(len(visdata['data'][0][thisbase])):
-                    #print(len(visdata['data'][0][thisbase]))
-                    amp=np.absolute(visdata['data'][0][thisbase][pt])
-                    l_m[nb]=np.log10(amp)
-                    '''
-'''
-                    if ant2==4: Theta_r[nb,ant1]=1
-                    if ant2!=4:
-                        Theta_r[nb,ant1]=1
-                        Theta_r[nb,ant2]=-1
-                    '''
-'''
-                    if ant1==refant: script_L[nb,iant2-1]=1
-                    if ant2==refant: script_L[nb,iant1]=1
-                    if ant1!=refant and ant1>refant:
-                        script_L[nb,iant1-1]=1
-                        script_L[nb,iant2-1]=1
-                    if ant1!=refant and ant2<refant:
-                        script_L[nb,iant1]=1
-                        script_L[nb,iant2]=1
-                    if (ant1!=refant and (ant2>refant and ant1<refant)):
-                        script_L[nb,iant1]=1
-                        script_L[nb,iant2-1]=1
+for time in ELO:
+    thistime=(visdata['axis_info']['time_axis']['MJDseconds']==time)
+    itime=np.where(ELO==time)[0]
+    #print(itime)
+    nb=0
+    for ant1 in np.unique(visdata['antenna1']):
+        for ant2 in np.unique(visdata['antenna2']):
+            if ant1 < ant2:
+                thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
+                iant1=np.where(antlist==ant1)[0]
+                iant2=np.where(antlist==ant2)[0]
+                #print(iant1)
+                #print(iant2)
+                if thisbase.sum()>0:
+                    #print("length!")
+                    #print(visdata['data'][0][thisbase][0][thistime][:])
+                    pt=visdata['data'][0][thisbase][0][thistime][0]
+                    amp=np.absolute(pt)
+                    if amp<=0:
+                        print("ah!")
+                        continue
+                    else:
+                        #print(nb)
+                        #print(amp)
+                        l_m[nb,itime]=np.log10(amp)
+                        '''
+                        if ant2==4: Theta_r[nb,ant1]=1
+                        if ant2!=4:
+                            Theta_r[nb,ant1]=1
+                            Theta_r[nb,ant2]=-1
+                        '''
+
+                        if ant1==refant: script_L[nb,iant2-1]=1
+                        if ant2==refant: script_L[nb,iant1]=1
+                        if ant1!=refant and ant1>refant:
+                            script_L[nb,iant1-1]=1
+                            script_L[nb,iant2-1]=1
+                        if ant1!=refant and ant2<refant:
+                            script_L[nb,iant1]=1
+                            script_L[nb,iant2]=1
+                        if (ant1!=refant and (ant2>refant and ant1<refant)):
+                            script_L[nb,iant1]=1
+                            script_L[nb,iant2-1]=1
 
 
 
-                    #if ant1==0: Theta_r[nb,ant2-1]=-1
-                    #if ant1!=0:
-                    #    Theta_r[nb,ant1-1]=1
-                    #    Theta_r[nb,ant2-1]=-1
+                        #if ant1==0: Theta_r[nb,ant2-1]=-1
+                        #if ant1!=0:
+                        #    Theta_r[nb,ant1-1]=1
+                        #    Theta_r[nb,ant2-1]=-1
 
                     nb+=1
 
@@ -127,4 +142,4 @@ bpts=range(nant-1)
 plt.scatter(bpts,Ir_converted[:,0])
 plt.show()
 
-'''
+
