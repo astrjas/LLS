@@ -40,7 +40,8 @@ print(nbl)
 #Defining Jacobian and measured phase matrix
 script_L=np.zeros((nbl,nant-1,len(ELO)),dtype=int)
 r_size=script_L.shape
-l_m=np.zeros((nbl,len(ELO)),dtype=float)
+l_m=np.zeros((nbl,1,len(ELO)),dtype=float)
+anttrack=np.full(shape=(nbl,2,len(ELO)),fill_value=-1,dtype=int)
 
 '''
 for ant1 in np.unique(visdata['antenna1']):
@@ -73,12 +74,14 @@ for time in ELO:
                     pt=visdata['data'][0][thisbase][0][thistime][0]
                     amp=np.absolute(pt)
                     if amp<=0:
-                        print("ah!")
+                        #print("ah!")
                         continue
                     else:
                         #print(nb)
                         #print(amp)
-                        l_m[nb,itime]=np.log10(amp)
+                        l_m[nb,0,itime]=np.log10(amp)
+                        anttrack[nb,0,itime]=ant1
+                        anttrack[nb,1,itime]=ant2
                         '''
                         if ant2==4: Theta_r[nb,ant1]=1
                         if ant2!=4:
@@ -89,14 +92,14 @@ for time in ELO:
                         if ant1==refant: script_L[nb,iant2-1]=1
                         if ant2==refant: script_L[nb,iant1]=1
                         if ant1!=refant and ant1>refant:
-                            script_L[nb,iant1-1]=1
-                            script_L[nb,iant2-1]=1
+                            script_L[nb,iant1-1,itime]=1
+                            script_L[nb,iant2-1,itime]=1
                         if ant1!=refant and ant2<refant:
-                            script_L[nb,iant1]=1
-                            script_L[nb,iant2]=1
+                            script_L[nb,iant1,itime]=1
+                            script_L[nb,iant2,itime]=1
                         if (ant1!=refant and (ant2>refant and ant1<refant)):
-                            script_L[nb,iant1]=1
-                            script_L[nb,iant2-1]=1
+                            script_L[nb,iant1,itime]=1
+                            script_L[nb,iant2-1,itime]=1
 
 
 
@@ -110,7 +113,7 @@ for time in ELO:
 print("script_L \n"+str(script_L))
 print("l_m \n"+str(l_m))
 
-l_r=l_Ir(ll_r=script_L,ll_m=l_m)
+l_r=[l_Ir(ll_r=script_L[:,:,x],ll_m=l_m[:,:,x]) for x in np.where(ELO==x)]
 #t1=np.linalg.inv(np.matmul(Theta_r.T,Theta_r))
 #t2=np.matmul(t1,Theta_r.T)
 #theta_Ir=np.matmul(t2,theta_m)
