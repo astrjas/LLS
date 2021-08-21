@@ -21,7 +21,7 @@ def l_Ir(ll_r,ll_m):
     return ll_Ir
 
 #Data file visibilities will be pulled from
-datams='sgr_apr07_flagcor.ms'
+datams='sgr_apr07_flagcor_tenbaseline.ms'
 ms.open(datams,nomodify=True)
 
 
@@ -85,6 +85,7 @@ for ant1 in np.unique(visdata['antenna1']):
                 pt=visdata['data'][0][thisbase][0]
                 #print(pt)
                 amp=np.absolute(pt)
+                if iant1==1 or iant2==1:amp=amp/2
                 #print(amp)
                 l_m[nb]=np.log10(amp)
                 anttrack[nb,0]=ant1
