@@ -8,7 +8,7 @@ def th_Ir(Th_r,th_m):
     return theta_Ir
 
 #Data file visibilities will be pulled from
-datams='sgr_apr07_flagcor_tenbaseline.ms'
+datams='sgr_apr07_flagcor.ms'
 ms.open(datams,nomodify=True)
 
 
@@ -51,7 +51,7 @@ for ant1 in np.unique(visdata['antenna1']):
                 print("ph!")
                 print(visdata['data'][0][thisbase][10])
                 ph=np.angle(visdata['data'][0][thisbase][10],deg=True)
-                if iant1==1 or iant2==1: ph=ph+90
+                #if iant1==1 or iant2==1: ph=ph+90
                 theta_m[nb]=ph
                 '''
                 if ant2==4: Theta_r[nb,ant1]=1
@@ -92,6 +92,8 @@ print("theta_Ir \n"+str(theta_Ir))
 
 #Residuals
 theta_del=theta_m-np.matmul(Theta_r,theta_Ir)
+#theta_del=np.matmul(Theta_r,theta_Ir)-theta_m
+
 
 print("theta_del \n"+str(theta_del))
 
@@ -107,6 +109,9 @@ bpts=range(nant-1)
 print(len(bpts))
 print(theta_Ir_final[:,0].shape)
 
+theta_rms = np.sqrt(np.matmul(theta_Ir_res.T,theta_Ir_res))
+
+print(theta_rms)
 
 plt.scatter(bpts,theta_Ir_final[:,0])
 plt.show()
