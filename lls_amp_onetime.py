@@ -20,20 +20,54 @@ def l_Ir(ll_r,ll_m):
     print(ll_Ir)
     return ll_Ir
 
+def arr_length(visdata,ELO,curr_time):
+    thistime=(visdata['axis_info']['time_axis']['MJDseconds']==curr_time)
+    rl=0
+    for ant1 in np.unique(visdata['antenna1']):
+        for ant2 in np.unique(visdata['antenna2']):
+            if ant1 < ant2:
+                thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
+                if thisbase.sum()>0:
+                    #print(len(thisbase==True))
+                    #print(visdata['data'][0][thisbase][0][thistime][0])
+                    pt=visdata['data'][0][thisbase][0][thistime][0]
+                    #print(pt)
+                    amp=np.absolute(pt)
+                    if amp<=0:
+                        #print("ah!")
+                        #nb+=1
+                        continue
+                    else:
+                        rl+=1
+    return rl
+    
+def t_length(visdata,ELO,nbl):
+    tl=0
+    gt=[]
+    for time in ELO:
+        itime=np.where(ELO==time)[0]
+        nzl=arr_length(visdata=visdata,ELO=ELO,curr_time=time)
+        if nzl==nbl:
+            tl+=1
+            gt.append(itime)
+    gt=np.hstack(gt)
+    return tl,gt
+
+
 #Data file visibilities will be pulled from
 datams='sgr_apr07_flagcor_tenbaseline.ms'
 ms.open(datams,nomodify=True)
 
 
 #Collect data from ms
-visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id'])
+visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id','axis_info'],ifraxis=True)
 visdata['data'] = np.squeeze(visdata['data'])
 ms.close()
 
 #print(len(visdata['axis_info']['time_axis']['MJDseconds']))
 #print(len(np.unique(visdata['axis_info']['time_axis']['MJDseconds'])))
 
-#ELO=np.unique(visdata['axis_info']['time_axis']['MJDseconds'])
+ELO=np.unique(visdata['axis_info']['time_axis']['MJDseconds'])
 #print(ELO)
 
 allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
@@ -64,17 +98,46 @@ for ant1 in np.unique(visdata['antenna1']):
             thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
             #print(len(visdata['data'][0][thisbase]))
 '''
+zan=3
+zeroant=(visdata['antenna1']==zan)
 
+#visdata['data'][0][zeroant]=1
 
 #Setting integer for cycling through baselines
 nb=0
 refant=4
 tb=0
 
+tsize,goodtimes=t_length(visdata=visdata,ELO=ELO,nbl=nbl)
+print(goodtimes)
+
+time=ELO[goodtimes[0]]
+vtime=visdata['axis_info']['time_axis']['MJDseconds']
+itime=np.where(ELO==time)[0]
+#print(itime)
+subset=visdata['data'][0]
+#print(subset.shape)
+#print("split")
+#print(visdata['data'][0,:][subset!=0].shape)
+#rsize=arr_length(visdata=visdata,ELO=ELO,curr_time=time)
+#print("RSIZE")
+#print(rsize)
+
+#script_L=np.zeros((rsize,nant),dtype=int)
+#l_m=np.zeros((rsize,1),dtype=float)
+
+#script_L=np.zeros((nbl,nant),dtype=int)
+#l_m=np.zeros((nbl,1),dtype=float)
+
+nb=0
+
 for ant1 in np.unique(visdata['antenna1']):
     for ant2 in np.unique(visdata['antenna2']):
         if ant1 < ant2:
             thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
+            print(thisbase)
+            thistime=(visdata['axis_info']['time_axis']['MJDseconds']==time)
+            print(visdata['data'][0][thisbase])
             iant1=np.where(antlist==ant1)[0]
             iant2=np.where(antlist==ant2)[0]
             #print(iant1)
@@ -82,10 +145,10 @@ for ant1 in np.unique(visdata['antenna1']):
             if thisbase.sum()>0:
                 #print("length!")
                 #print(visdata['data'][0][thisbase][0][thistime][0])
-                pt=visdata['data'][0][thisbase][0]
+                pt=visdata['data'][0][thisbase][0][thistime][0]
                 #print(pt)
                 amp=np.absolute(pt)
-                if iant1==1 or iant2==1:amp=amp/2
+                #if iant1==2 or iant2==2:amp=amp/2
                 #print(amp)
                 l_m[nb]=np.log10(amp)
                 anttrack[nb,0]=ant1

@@ -7,13 +7,47 @@ def th_Ir(Th_r,th_m):
     theta_Ir=np.matmul(t2,th_m)
     return theta_Ir
 
+def arr_length(visdata,ELO,curr_time):
+    thistime=(visdata['axis_info']['time_axis']['MJDseconds']==curr_time)
+    rl=0
+    for ant1 in np.unique(visdata['antenna1']):
+        for ant2 in np.unique(visdata['antenna2']):
+            if ant1 < ant2:
+                thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
+                if thisbase.sum()>0:
+                    #print(len(thisbase==True))
+                    #print(visdata['data'][0][thisbase][0][thistime][0])
+                    pt=visdata['data'][0][thisbase][0][thistime][0]
+                    #print(pt)
+                    amp=np.absolute(pt)
+                    if amp<=0:
+                        #print("ah!")
+                        #nb+=1
+                        continue
+                    else:
+                        rl+=1
+    return rl
+    
+def t_length(visdata,ELO,nbl):
+    tl=0
+    gt=[]
+    for time in ELO:
+        itime=np.where(ELO==time)[0]
+        nzl=arr_length(visdata=visdata,ELO=ELO,curr_time=time)
+        if nzl==nbl:
+            tl+=1
+            gt.append(itime)
+    gt=np.hstack(gt)
+    return tl,gt
+
+
 #Data file visibilities will be pulled from
-datams='sgr_apr07_flagcor.ms'
+datams='sgr_apr07_flagcor_tenbaseline.ms'
 ms.open(datams,nomodify=True)
 
 
 #Collect data from ms
-visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id'])
+visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id','axis_info'],ifraxis=True)
 visdata['data'] = np.squeeze(visdata['data'])
 ms.close()
 
@@ -36,6 +70,13 @@ Theta_r=np.zeros((nbl,nant-1),dtype=int)
 r_size=Theta_r.shape
 theta_m=np.zeros((nbl,1),dtype=float)
 
+tsize,goodtimes=t_length(visdata=visdata,ELO=ELO,nbl=nbl)
+print(goodtimes)
+
+time=ELO[goodtimes[0]]
+
+
+
 #Setting integer for cycling through baselines
 nb=0
 refant=2
@@ -49,9 +90,10 @@ for ant1 in np.unique(visdata['antenna1']):
             #print(iant2)
             if thisbase.sum()>0:
                 print("ph!")
-                print(visdata['data'][0][thisbase][10])
-                ph=np.angle(visdata['data'][0][thisbase][10],deg=True)
-                #if iant1==1 or iant2==1: ph=ph+90
+                print(visdata['data'][0][thisbase][0][thistime][0])
+                ph=np.angle(visdata['data'][0][thisbase][0][thistime][0],deg=True)
+                if iant1==1: ph=ph+90
+                if iant2==1: ph-=90
                 theta_m[nb]=ph
                 '''
                 if ant2==4: Theta_r[nb,ant1]=1
