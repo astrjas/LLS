@@ -20,13 +20,48 @@ def l_Ir(ll_r,ll_m):
     print(ll_Ir)
     return ll_Ir
 
+def arr_length(visdata,ELO,curr_time):
+    thistime=(visdata['axis_info']['time_axis']['MJDseconds']==curr_time)
+    rl=0
+    for ant1 in np.unique(visdata['antenna1']):
+        for ant2 in np.unique(visdata['antenna2']):
+            if ant1 < ant2:
+                thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
+                if thisbase.sum()>0:
+                    #print(len(thisbase==True))
+                    #print(visdata['data'][0][thisbase][0][thistime][0])
+                    pt=visdata['data'][0][thisbase][0][thistime][0]
+                    #print(pt)
+                    amp=np.absolute(pt)
+                    if amp<=0:
+                        #print("ah!")
+                        #nb+=1
+                        continue
+                    else:
+                        rl+=1
+    return rl
+    
+def t_length(visdata,ELO,nbl):
+    tl=0
+    gt=[]
+    for time in ELO:
+        itime=np.where(ELO==time)[0]
+        nzl=arr_length(visdata=visdata,ELO=ELO,curr_time=time)
+        if nzl==nbl:
+            tl+=1
+            gt.append(itime)
+    gt=np.hstack(gt)
+    return tl,gt
+
+
+
 #Data file visibilities will be pulled from
 datams='sgr_apr07_flagcor_tenbaseline.ms'
 ms.open(datams,nomodify=True)
 
 
 #Collect data from ms
-visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id'])
+visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id','axis_info'],ifraxis=True)
 visdata['data'] = np.squeeze(visdata['data'])
 ms.close()
 
@@ -74,6 +109,12 @@ nb=0
 refant=4
 tb=0
 
+tsize,goodtimes=t_length(visdata=visdata,ELO=ELO,nbl=nbl)
+print(goodtimes)
+
+time=ELO[goodtimes[0]]
+
+
 for ant1 in np.unique(visdata['antenna1']):
     for ant2 in np.unique(visdata['antenna2']):
         if ant1 < ant2:
@@ -85,7 +126,7 @@ for ant1 in np.unique(visdata['antenna1']):
             if thisbase.sum()>0:
                 #print("length!")
                 #print(visdata['data'][0][thisbase][0][thistime][0])
-                pt=visdata['data'][0][thisbase][0]
+                pt=visdata['data'][0][thisbase][0][thistime][0]
                 #print(pt)
                 amp=np.absolute(pt)
                 #if iant1==2 or iant2==2:amp=amp/2
@@ -152,7 +193,7 @@ for ant1 in np.unique(visdata['antenna1']):
             if thisbase.sum()>0:
                 #print("length!")
                 #print(visdata['data'][0][thisbase][0][thistime][0])
-                pt=visdata['data'][0][thisbase][0]
+                pt=visdata['data'][0][thisbase][0][thistime][0]
                 #print(type(pt))
                 newpt[nb1,0]=pt.real/np.sqrt(Ir_converted[iant1,0]*Ir_converted[iant2,0])
                 
