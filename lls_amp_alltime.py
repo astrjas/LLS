@@ -55,7 +55,7 @@ def t_length(visdata,ELO,nbl):
 
 
 #Data file visibilities will be pulled from
-datams='sgr_apr07_flagcor.ms'
+datams='sgr_apr07_flagcor_tenbaseline.ms'
 ms.open(datams,nomodify=True)
 
 
@@ -223,8 +223,13 @@ bpts=range(nant)
 #print(len(bpts))
 #print([:,0].shape)
 
-print(ELO[goodtimes[0]])
-print(Ir_converted[:,0,0])
+#print(ELO[goodtimes[0]])
+#print(Ir_converted[:,0,0])
+
+l_rms = np.dstack([np.sqrt(np.matmul(l_Ir_res[:,:,x].T,l_Ir_res[:,:,x])) for x in range(tsize)])
+
+print(np.mean(l_rms))
+
 
 for t in range(tsize):
     bits=np.zeros((nant))
