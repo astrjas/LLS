@@ -4,6 +4,7 @@ import time
 import matplotlib.pyplot as plt
 import os.path
 from os import path
+import sys
 import numpy as np
 
 #Setting default value for TCLEAN stopcode
@@ -42,6 +43,89 @@ os.system('rm -rf '+dmsprefix+'_selfcal*_ext_it*.ms')
 os.system('rm -rf '+dmsprefix+'_selfcal*_mod_it*.ms')
 os.system('rm -rf '+dmsprefix+'_selfcal*_ext2_it*.ms')
 
+def l_Ir(ll_r,ll_m):
+    print("ll_r")
+    print(ll_r)
+    print("ll_m")
+    print(ll_m)
+    #ll_r_T=np.transpose(ll_r,(1,0))
+    t0=np.matmul(ll_r.T,ll_r)
+    #print(t0[np.nonzero(t0)])
+    t1=np.linalg.inv(np.matmul(ll_r.T,ll_r))
+    print("t1")
+    print(t1)
+    t2=np.matmul(t1,ll_r.T)
+    print("t2")
+    print(t2)
+    ll_Ir=np.matmul(t2,ll_m)
+    print("answer!")
+    print(ll_Ir)
+    return ll_Ir
+
+def arr_length(visdata,ELO,curr_time):
+    thistime=(visdata['axis_info']['time_axis']['MJDseconds']==curr_time)
+    rl=0
+    for ant1 in np.unique(visdata['antenna1']):
+        for ant2 in np.unique(visdata['antenna2']):
+            if ant1 < ant2:
+                thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
+                if thisbase.sum()>0:
+                    #print(len(thisbase==True))
+                    #print(visdata['data'][0][thisbase][0][thistime][0])
+                    pt=visdata['data'][0][thisbase][0][thistime][0]
+                    #print(pt)
+                    amp=np.absolute(pt)
+                    if amp<=0:
+                        #print("ah!")
+                        #nb+=1
+                        continue
+                    else:
+                        rl+=1
+    return rl
+    
+def t_length(visdata,ELO,nbl):
+    tl=0
+    gt=[]
+    for time in ELO:
+        itime=np.where(ELO==time)[0]
+        nzl=arr_length(visdata=visdata,ELO=ELO,curr_time=time)
+        if nzl==nbl:
+            tl+=1
+            gt.append(itime)
+    gt=np.hstack(gt)
+    return tl,gt
+
+
+ms.open(datams1,nomodify=True)
+visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id','sigma','axis_info'],ifraxis=True)
+visdata['data'] = np.squeeze(visdata['data'])
+ms.close()
+
+allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
+antlist=np.unique(allants)
+#print(antlist)
+
+#Calculating number of antennas and baselines
+nant=int(len(antlist))
+nbl=int(nant*(nant-1)/2)
+
+print(nant)
+print(nbl)
+
+
+print(len(visdata['axis_info']['time_axis']['MJDseconds']))
+print(len(np.unique(visdata['axis_info']['time_axis']['MJDseconds'])))
+
+ELO=np.unique(visdata['axis_info']['time_axis']['MJDseconds'])
+
+#print("num intervals: %f" %((np.max(ELO)-np.min(ELO))/240))
+#print(.402600*240) 
+#sys.exit()
+
+
+tsize,goodtimes=t_length(visdata=visdata,ELO=ELO,nbl=nbl)
+print("TSIZE")
+print(goodtimes)
 
 #Splitting and channel averaging (if desired)
 os.system('rm -rf '+dmsavg+' '+dmsavg+'.flagversions')
@@ -73,15 +157,20 @@ tb.close()
 scan = np.unique(scan)
 print(scan)
 
+
+
 #Calculating RMS of data for CLEAN threshold
 ms.open(datams0,nomodify=True)
 sigs=ms.getdata(['sigma'])
 fsigs=np.asarray(sigs['sigma']).flatten()
+print("Fsig shape:",fsigs.shape)
 invsigs=1./(fsigs*fsigs)
 sumsigs=np.sum(invsigs)
 rmst=2.*np.sqrt(1./sumsigs)
-print(rmst)
+print("RMS: %e" %(rmst))
 ms.close()
+
+
 
 #Creating and initializing data file to store UVMULTIFIT pt source flux
 g=open("uvmflux_"+target+".txt","w")
@@ -91,11 +180,11 @@ g.write("it scan ext mod moderr\n")
 #Start with first iteration
 it=0
 
+refant=35 #DV20 index
 
 #The wily (formerly) infinite while loop
 #while(1):
-while it<=2:
-
+while it<=0:
     #Declaring empty arrays for mod UVM flux and error
     muvmf=np.array([])
     muvmferr=np.array([])
@@ -216,7 +305,7 @@ while it<=2:
     ext2=tb.getcol('CORRECTED_DATA')
     tb.close()
 
-        #Splitting and creating the files
+    #Splitting and creating the files
     #The datacolumn here means nothing, it will be replaced
     os.system('rm -rf '+datams_ext3+' '+datams_ext3+'.flagversions')
     split(vis=datams_ext2,outputvis=datams_ext3,datacolumn='data')
@@ -255,6 +344,70 @@ while it<=2:
            interactive=0,
            cell='0.2arcsec')
 
+
+    #Collect data from ms
+    ms.open(datams_ext3,nomodify=True)
+    visdata = ms.getdata(['antenna1','antenna2','data','model_data','data_desc_id','sigma','axis_info'],ifraxis=True)
+    visdata['data'] = np.squeeze(visdata['data'])
+    visdata['model_data'] = np.squeeze(visdata['model_data'])
+    ms.close()
+
+
+    ELO_diff=np.max(ELO)-np.min(ELO)
+    nint=int(ELO_diff/240)+1
+    ELO_range=np.linspace(np.min(ELO),np.max(ELO),nint)
+
+    #Jacobian and measured phase matrix
+    Theta_r=np.zeros((nbl,nant-1,nint),dtype=int)
+    theta_m=np.zeros((nbl,1,nint),dtype=float)
+
+    #Defining Jacobian and measured amp matrix
+    script_L=np.zeros((nbl,nant,nint),dtype=int)
+    l_m=np.zeros((nbl,1,nint),dtype=float)
+    anttrack=np.full(shape=(nbl,2,nint),fill_value=-1,dtype=int)
+
+
+    for t_step in range(len(ELO_range)-1):
+        datachunk=[x for x in visdata['data'] if (visdata['axis_info']['time_axis']['MJDseconds']>=ELO[t_step] and visdata['axis_info']['time_axis']['MJDseconds']<=ELO[t_step+1])]
+        tchunk=[x for x in goodtimes if goodtimes>=ELO[t_step] and goodtimes<=ELO[t_step+1]]
+        for ant1 in np.unique(visdata['antenna1']):
+            for ant2 in np.unique(visdata['antenna2']):
+                if ant1 < ant2:
+                    thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
+                    iant1=np.where(antlist==ant1)[0]
+                    iant2=np.where(antlist==ant2)[0]
+                    #print(iant1)
+                    #print(iant2)
+                    if thisbase.sum()>0:
+                        print("ph!")
+                        print(datachunk['data'][0][thisbase])
+                        print(np.mean(datachunk['data'][0][thisbase][0]))
+                        #if just good times, can use list comprehension skjekj[][x] for x in goodtimes
+                        sys.exit()
+                        ph=np.angle(visdata['data'][0][thisbase][0][thistime][0],deg=True)
+
+                        anttrack[nb,0,t_step]=ant1
+                        anttrack[nb,1,t_step]=ant2
+
+                        theta_m[nb]=ph
+
+                        if ant1==refant: Theta_r[nb,iant2-1,t_step]=-1
+                        if ant2==refant: Theta_r[nb,iant1,t_step]=1
+                        if ant1!=refant and ant1>refant:
+                            Theta_r[nb,iant1-1,t_step]=1
+                            Theta_r[nb,iant2-1,t_step]=-1
+                        if ant1!=refant and ant2<refant:
+                            Theta_r[nb,iant1,t_step]=1
+                            Theta_r[nb,iant2,t_step]=-1
+                        if (ant1!=refant and (ant2>refant and ant1<refant)):
+                            Theta_r[nb,iant1,t_step]=1
+                            Theta_r[nb,iant2-1,t_step]=-1
+
+                        nb+=1
+        tb+=1
+
+        
+    '''
     #Self-calibrating final cleaned residuals
     os.system("rm -rf phaseamp"+str(it)+".cal")
     gaincal(vis=datams_ext3,
@@ -275,6 +428,7 @@ while it<=2:
              field="0",
              gaintable=['phaseamp'+str(it)+'.cal'])
              #interp='linear')
+    '''
 
     #Dirty image of gain-calibrated data
     imname3=dmsprefix+'_it'+'{0:02d}'.format(it)+'_selfcalmodel'
