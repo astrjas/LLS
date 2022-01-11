@@ -33,36 +33,66 @@ visdata = ms.getdata(['antenna1','antenna2','data','axis_info'],ifraxis=True)
 #printing correlations
 print(visdata['axis_info']['corr_axis'])
 
+#Squeeze data then close ms
 visdata['data'] = np.squeeze(visdata['data'])
 print("data shape",visdata['data'].shape)
 ms.close()
 
+#Pulling all unique timestamps, print its length and then all times
 ELO=np.unique(visdata['axis_info']['time_axis']['MJDseconds'])
 print(len(ELO))
 print(len(visdata['axis_info']['time_axis']['MJDseconds']))
 #print([x-ELO[0] for x in ELO])
 
+#Creating a tf dictionary for each ant and whether time is good or bad there
 goodant=dict()
+#tfdict for each time and whether ant good or bad
+goodt=dict()
 
 #XX correlation
 xx=visdata['data'][0]
-#tf matrix for where ant is bad
+#tf matrix for where ant is bad (True)
 tfdata=np.abs(xx)<=0
+print(tfdata)
 
 #cycle through each ant
 for ant in np.unique(visdata['antenna1']):
     print("ANT",ant)
     #all baselines w/ this ant
     thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
-    #pull all baselines for this ant at all times
+    #pull all baselines for this ant at all times w/in tfdata
     allt1ant=tfdata[thisant][:]
+    #printing number of baselines w/ this ant and all times to make sure right shape
     print("allt1ant",allt1ant.shape)
+    #evaluating if baseline/antenna is bad at each time
     ant_tf=np.all(allt1ant,axis=0)
+    #Adding to goodant
+    goodant[ant]=ant_tf
     print("ant_tf",ant_tf.shape)
     plt.plot(ant_tf)
+    #plotting and saving this
     plt.savefig("./tfgraphs/ant_tf_ant%i.png"%(ant),overwrite=True)
     plt.clf()
     
+for i in range(len(visdata['axis_info']['time_axis']['MJDseconds'])):
+    j=0
+    tfstore=np.zeros(len(np.unique(visdata['antenna1'])),dtype=bool)
+    ct=visdata['axis_info']['time_axis']['MJDseconds'][i]
+    print("tstamp",ct)
+    for ant in np.unique(visdata['antenna1']):
+        tfstore[j]=goodant[ant][i]
+        #print(goodant[ant][i])
+        j+=1
+    #print(tfstore)
+    goodt[ct]=tfstore
+    #plt.plot(tfstore)
+    #plotting and saving this
+    #plt.savefig("./tfgraphs/time_tf_t%f.png"%(ELO[i]),overwrite=True)
+    #plt.clf()
+
+
+
+#END OF DOCUMENTED UNIVERSE
 
 #ant1dict,ant2dict,ant_good_v=gf.antdicts(visdata,ELO)
 #tkeys=ant1dict.keys()
