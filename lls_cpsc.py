@@ -62,6 +62,13 @@ def l_Ir(ll_r,ll_m):
     print(ll_Ir)
     return ll_Ir
 
+def th_Ir(Th_r,th_m):
+    t1=np.linalg.inv(np.matmul(Th_r.T,Th_r))
+    t2=np.matmul(t1,Th_r.T)
+    theta_Ir=np.matmul(t2,th_m)
+    return theta_Ir
+
+
 def arr_length(visdata,ELO,curr_time):
     thistime=(visdata['axis_info']['time_axis']['MJDseconds']==curr_time)
     rl=0
@@ -366,10 +373,14 @@ while it<=0:
     l_m=np.zeros((nbl,1,nint),dtype=float)
     anttrack=np.full(shape=(nbl,2,nint),fill_value=-1,dtype=int)
 
-
+    nb=0
+    tb=0
     for t_step in range(len(ELO_range)-1):
-        datachunk=[x for x in visdata['data'] if (visdata['axis_info']['time_axis']['MJDseconds']>=ELO[t_step] and visdata['axis_info']['time_axis']['MJDseconds']<=ELO[t_step+1])]
+        itime=np.where(ELO==time)[0]
+        igtime=np.where(goodtimes==itime)
+        datachunk=[x for x in visdata['data'] if (visdata['axis_info']['time_axis']['MJDseconds'][y]>=ELO[t_step] and visdata['axis_info']['time_axis']['MJDseconds'][y]<=ELO[t_step+1] for y in range(len(allts)))]
         tchunk=[x for x in goodtimes if goodtimes>=ELO[t_step] and goodtimes<=ELO[t_step+1]]
+        nb=0
         for ant1 in np.unique(visdata['antenna1']):
             for ant2 in np.unique(visdata['antenna2']):
                 if ant1 < ant2:
@@ -381,10 +392,22 @@ while it<=0:
                     if thisbase.sum()>0:
                         print("ph!")
                         print(datachunk['data'][0][thisbase])
-                        print(np.mean(datachunk['data'][0][thisbase][0]))
+                        print(datachunk['data'][0][thisbase][0])
                         #if just good times, can use list comprehension skjekj[][x] for x in goodtimes
                         sys.exit()
                         ph=np.angle(visdata['data'][0][thisbase][0][thistime][0],deg=True)
+                        pt=visdata['data'][0][thisbase][0][thistime][0]
+                        amp=np.absolute(pt)
+
+                        if amp<=0: continue
+
+                        l_m[nb,0,igtime]=np.log10(amp)
+                        anttrack[nb,0,igtime]=ant1
+                        anttrack[nb,1,igtime]=ant2
+
+                        script_L[nb,iant1,t_step]=1
+                        script_L[nb,iant2,t_step]=1
+
 
                         anttrack[nb,0,t_step]=ant1
                         anttrack[nb,1,t_step]=ant2
