@@ -99,7 +99,7 @@ for i in range(ntimes):
     ct=visdata['axis_info']['time_axis']['MJDseconds'][i]
     print("tstamp",ct)
     for ant in np.unique(visdata['antenna1']):
-        tfstore[j]=goodant[ant][i]
+        tfstore[j]=allant[ant][i]
         #print(goodant[ant][i])
         j+=1
     #print(tfstore)
@@ -181,19 +181,21 @@ l_Ir_conv_dict={}
 
 smc=0
 
-#Jacobian and measured phase matrix
-Theta_r=np.zeros((nbl,nant-1,ntimes),dtype=int)
-theta_m=np.zeros((nbl,1,ntimes),dtype=float)
-
-#Defining Jacobian and measured amp matrix
-script_L=np.zeros((nbl,nant,ntimes),dtype=int)
-l_m=np.zeros((nbl,1,ntimes),dtype=float)
-
-
 for i in range(len(antinfo['timestamp'])):
+
+    #Jacobian and measured phase matrix
+    Theta_r=np.zeros((nbl,nant-1),dtype=int)
+    theta_m=np.zeros((nbl,1),dtype=float)
+
+    #Defining Jacobian and measured amp matrix
+    script_L=np.zeros((nbl,nant),dtype=int)
+    l_m=np.zeros((nbl,1),dtype=float)
+
+
     #print(time)
     #if (time in tkeys)==False:continue
     thistime=(visdata['axis_info']['time_axis']['MJDseconds']==antinfo['timestamp'][i])
+    time=antinfo['timestamp'][i]
 
     #alla1=ant1dict[time]
     #alla2=ant2dict[time]
@@ -209,8 +211,8 @@ for i in range(len(antinfo['timestamp'])):
     #Pulling antennas that are bad for this time
     badant=np.where(gt==True)
     #print(badbase)
-    if len(badbase)!=0:
-        for ant in badbase:
+    if len(badant)!=0:
+        for ant in badant:
             thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
             #replacing [thistime] with i, we'll see how it goes
             xx[thisant][thistime]=np.nan
@@ -273,16 +275,16 @@ for i in range(len(antinfo['timestamp'])):
     #script_L_f=np.vstack([script_L[x] for x in range(len(script_L)) if len(np.unique(script_L[x]))>1])
     #l_m_f=np.vstack([l_m[x] for x in range(len(l_m)) if len(np.unique(script_L[x]))>1])
 
-    #Theta_r_f=np.vstack([Theta_r[x] for x in range(len(Theta_r)) if len(np.unique(Theta_r[x]))>1])
+    Theta_r=np.vstack([Theta_r[x] for x in range(len(Theta_r)) if len(np.unique(Theta_r[x]))>1])
     #print(Theta_r.shape)
     #print(Theta_r_f)
     #theta_m_f=np.vstack([theta_m[x] for x in range(len(theta_m)) if len(np.unique(Theta_r[x]))>1])
     #print(theta_m.shape)
     #print(theta_m_f)
 
-    if np.linalg.det(np.matmul(script_L.T,script_L))==0 or np.linalg.det(np.matmul(Theta_r.T,Theta_r))==0:
-        smc+=1
-        continue
+    #if np.linalg.det(np.matmul(script_L.T,script_L))==0 or np.linalg.det(np.matmul(Theta_r.T,Theta_r))==0:
+        #smc+=1
+        #continue
 
 
     gf.dict_update(theta_r_dict,time,Theta_r)
@@ -296,33 +298,42 @@ for i in range(len(antinfo['timestamp'])):
     #print("l_m \n"+str(l_m))
 
     #if len(l_m)==1: continue
-    l_r=gf.l_Ir(ll_r=script_L,ll_m=l_m)
-    #print("l_r \n"+str(l_r))
+
+    script_L_nn=gf.nonan(script_L)
+    l_m_nn=gf.nonan(l_m)
+
+    #l_r=np.dstack([gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn[:,:,x]) for x in range(ntimes)])
+
+    l_r=gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn)
+    print("l_r \n"+str(l_r))
 
     
     #print("Theta_r \n"+str(Theta_r))
     #print("theta_m \n"+str(theta_m))
 
+    Theta_r_nn=gf.nonan(Theta_r)
+    theta_m_nn=gf.nonan(theta_m)
+
     #if len(theta_m)==1: theta_Ir=theta_m/Theta_r
-    theta_Ir=gf.th_Ir(Th_r=Theta_r[~np.isnan(Theta_r)],th_m=theta_m[~np.isnan(theta_m)])
-    #print("theta_Ir \n"+str(theta_Ir))
+    theta_Ir=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_m_nn)
+    print("theta_Ir \n"+str(theta_Ir))
 
 
     #Residuals
-    l_del=l_m-np.matmul(script_L[~np.isnan(script_L)],l_r[~np.isnan(l_r)])
+    l_del=l_m-np.matmul(script_L_nn,l_r)
     #print("l_del \n"+str(l_del))
     gf.dict_update(l_del_dict,time,l_del)
     #print(l_del.shape)
 
-    l_Ir_res=gf.l_Ir(ll_r=script_L[~np.isnan(script_L)],ll_m=l_del[~np.isnan(l_del)])
+    l_Ir_res=gf.l_Ir(ll_r=script_L_nn,ll_m=l_del)
 
     #print("l_Ir w/ resids: \n"+str(l_Ir_res))
 
-    theta_del=theta_m-np.matmul(Theta_r[~np.isnan(Theta_r)],theta_Ir[~np.isnan(theta_Ir)])
+    theta_del=theta_m_nn-np.matmul(Theta_r_nn,theta_Ir)
     #print("theta_del \n"+str(theta_del))
     gf.dict_update(theta_del_dict,time,theta_del)
 
-    theta_Ir_res=gf.th_Ir(Th_r=Theta_r_f[~np.isnan(Theta_r_f)],th_m=theta_del[~np.isnan(theta_del)])
+    theta_Ir_res=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_del)
     #print("theta_Ir w/ resids: \n"+str(theta_Ir_res))
     
 
