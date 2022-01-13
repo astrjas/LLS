@@ -38,7 +38,10 @@ visdata['data'] = np.squeeze(visdata['data'])
 print("data shape",visdata['data'].shape)
 ms.close()
 
-nant=len(np.unique(visdata['antenna1']))
+allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
+antlist=np.unique(allants)
+
+nant=len(antlist)
 nbl=int(nant*(nant-1)/2)
 ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
 
@@ -68,7 +71,7 @@ print(tfdata)
 
 #cycle through each ant
 a=0
-for ant in np.unique(visdata['antenna1']):
+for ant in antlist:
     print("ANT",ant)
     #all baselines w/ this ant
     thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
@@ -92,7 +95,7 @@ antinfo['goodant']=allant
    
 for i in range(ntimes):
     j=0
-    tfstore=np.zeros(len(np.unique(visdata['antenna1'])),dtype=bool)
+    tfstore=np.zeros(len(antlist),dtype=bool)
     ct=visdata['axis_info']['time_axis']['MJDseconds'][i]
     print("tstamp",ct)
     for ant in np.unique(visdata['antenna1']):
@@ -108,9 +111,6 @@ for i in range(ntimes):
     #plt.clf()
 
 antinfo['goodt']=alltim
-
-allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
-antlist=np.unique(allants)
 
 allgoodtime=0
 allbad=0
@@ -212,6 +212,7 @@ for i in range(len(antinfo['timestamp'])):
     if len(badbase)!=0:
         for ant in badbase:
             thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
+            #replacing [thistime] with i, we'll see how it goes
             xx[thisant][thistime]=np.nan
 
     #xxnonan=xx[~np.isnan(xx)]
@@ -230,15 +231,17 @@ for i in range(len(antinfo['timestamp'])):
     #print(nbl)
     
     nb=0
-    for ant1 in np.unique(alla1):
-        for ant2 in np.unique(alla2):
+    for ant1 in np.unique(visdata['antenna1']):
+        for ant2 in np.unique(visdata['antenna2']):
             if ant1 < ant2:
                 thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
                 iant1=np.where(antlist==ant1)[0]
+                #print(iant1)
                 iant2=np.where(antlist==ant2)[0]
+                #print(iant2)
                 if thisbase.sum()>0:
                     #potential 0 after thisbase and thistime
-                    pt=xx[thisbase][thistime]
+                    pt=xx[thisbase][0][i]
                     ph=np.angle(pt,deg=True)
                     amp=np.absolute(pt)
                     
@@ -264,35 +267,36 @@ for i in range(len(antinfo['timestamp'])):
                         Theta_r[nb,iant1,i]=1
                         Theta_r[nb,iant2-1,i]=-1
                     nb+=1
+
     #here! yes here!    
     #print(script_L)
-    script_L_f=np.vstack([script_L[x] for x in range(len(script_L)) if len(np.unique(script_L[x]))>1])
-    l_m_f=np.vstack([l_m[x] for x in range(len(l_m)) if len(np.unique(script_L[x]))>1])
+    #script_L_f=np.vstack([script_L[x] for x in range(len(script_L)) if len(np.unique(script_L[x]))>1])
+    #l_m_f=np.vstack([l_m[x] for x in range(len(l_m)) if len(np.unique(script_L[x]))>1])
 
-    Theta_r_f=np.vstack([Theta_r[x] for x in range(len(Theta_r)) if len(np.unique(Theta_r[x]))>1])
+    #Theta_r_f=np.vstack([Theta_r[x] for x in range(len(Theta_r)) if len(np.unique(Theta_r[x]))>1])
     #print(Theta_r.shape)
-    print(Theta_r_f)
-    theta_m_f=np.vstack([theta_m[x] for x in range(len(theta_m)) if len(np.unique(Theta_r[x]))>1])
+    #print(Theta_r_f)
+    #theta_m_f=np.vstack([theta_m[x] for x in range(len(theta_m)) if len(np.unique(Theta_r[x]))>1])
     #print(theta_m.shape)
     #print(theta_m_f)
 
-    if np.linalg.det(np.matmul(script_L_f.T,script_L_f))==0 or np.linalg.det(np.matmul(Theta_r_f.T,Theta_r_f))==0:
+    if np.linalg.det(np.matmul(script_L.T,script_L))==0 or np.linalg.det(np.matmul(Theta_r.T,Theta_r))==0:
         smc+=1
         continue
 
 
-    gf.dict_update(theta_r_dict,time,Theta_r_f)
-    gf.dict_update(theta_m_dict,time,theta_m_f)
+    gf.dict_update(theta_r_dict,time,Theta_r)
+    gf.dict_update(theta_m_dict,time,theta_m)
 
 
-    gf.dict_update(script_L_dict,time,script_L_f)
-    gf.dict_update(l_m_dict,time,l_m_f)
+    gf.dict_update(script_L_dict,time,script_L)
+    gf.dict_update(l_m_dict,time,l_m)
 
     #print("script_L \n"+str(script_L))
     #print("l_m \n"+str(l_m))
 
     #if len(l_m)==1: continue
-    l_r=gf.l_Ir(ll_r=script_L_f,ll_m=l_m_f)
+    l_r=gf.l_Ir(ll_r=script_L,ll_m=l_m)
     #print("l_r \n"+str(l_r))
 
     
@@ -300,25 +304,25 @@ for i in range(len(antinfo['timestamp'])):
     #print("theta_m \n"+str(theta_m))
 
     #if len(theta_m)==1: theta_Ir=theta_m/Theta_r
-    theta_Ir=gf.th_Ir(Th_r=Theta_r_f,th_m=theta_m_f)
+    theta_Ir=gf.th_Ir(Th_r=Theta_r[~np.isnan(Theta_r)],th_m=theta_m[~np.isnan(theta_m)])
     #print("theta_Ir \n"+str(theta_Ir))
 
 
     #Residuals
-    l_del=l_m_f-np.matmul(script_L_f,l_r)
+    l_del=l_m-np.matmul(script_L[~np.isnan(script_L)],l_r[~np.isnan(l_r)])
     #print("l_del \n"+str(l_del))
     gf.dict_update(l_del_dict,time,l_del)
     #print(l_del.shape)
 
-    l_Ir_res=gf.l_Ir(ll_r=script_L_f,ll_m=l_del)
+    l_Ir_res=gf.l_Ir(ll_r=script_L[~np.isnan(script_L)],ll_m=l_del[~np.isnan(l_del)])
 
     #print("l_Ir w/ resids: \n"+str(l_Ir_res))
 
-    theta_del=theta_m_f-np.matmul(Theta_r_f,theta_Ir)
+    theta_del=theta_m-np.matmul(Theta_r[~np.isnan(Theta_r)],theta_Ir[~np.isnan(theta_Ir)])
     #print("theta_del \n"+str(theta_del))
     gf.dict_update(theta_del_dict,time,theta_del)
 
-    theta_Ir_res=gf.th_Ir(Th_r=Theta_r_f,th_m=theta_del)
+    theta_Ir_res=gf.th_Ir(Th_r=Theta_r_f[~np.isnan(Theta_r_f)],th_m=theta_del[~np.isnan(theta_del)])
     #print("theta_Ir w/ resids: \n"+str(theta_Ir_res))
     
 
@@ -401,6 +405,15 @@ for t_step in range(len(ELO_range)-1):
     print(datachunk_amp)
     nonan+=1
 
+
+
+
+
+
+
+
+
+#where comments ended
 '''
 for f in tkeys:
     datachunk_ph=len(theta_Ir_dict[f])
