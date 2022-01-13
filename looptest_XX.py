@@ -181,6 +181,14 @@ l_Ir_conv_dict={}
 
 smc=0
 
+#Jacobian and measured phase matrix
+Theta_r=np.zeros((nbl,nant-1,ntimes),dtype=int)
+theta_m=np.zeros((nbl,1,ntimes),dtype=float)
+
+#Defining Jacobian and measured amp matrix
+script_L=np.zeros((nbl,nant,ntimes),dtype=int)
+l_m=np.zeros((nbl,1,ntimes),dtype=float)
+
 
 for i in range(len(antinfo['timestamp'])):
     #print(time)
@@ -206,6 +214,7 @@ for i in range(len(antinfo['timestamp'])):
             thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
             xx[thisant][thistime]=np.nan
 
+    #xxnonan=xx[~np.isnan(xx)]
 
     #allants=np.concatenate((alla1,alla2))
     #antlist=np.unique(allants)
@@ -220,14 +229,6 @@ for i in range(len(antinfo['timestamp'])):
     #nbl=int(nant*(nant-1)/2)
     #print(nbl)
     
-    #Jacobian and measured phase matrix
-    Theta_r=np.zeros((nbl,nant-1),dtype=int)
-    theta_m=np.zeros((nbl,1),dtype=float)
-
-    #Defining Jacobian and measured amp matrix
-    script_L=np.zeros((nbl,nant),dtype=int)
-    l_m=np.zeros((nbl,1),dtype=float)
-
     nb=0
     for ant1 in np.unique(alla1):
         for ant2 in np.unique(alla2):
@@ -236,33 +237,32 @@ for i in range(len(antinfo['timestamp'])):
                 iant1=np.where(antlist==ant1)[0]
                 iant2=np.where(antlist==ant2)[0]
                 if thisbase.sum()>0:
-                    pt=visdata['data'][0][thisbase][0][thistime][0]
+                    #potential 0 after thisbase and thistime
+                    pt=xx[thisbase][thistime]
                     ph=np.angle(pt,deg=True)
                     amp=np.absolute(pt)
                     
-                    if amp<=0: continue
-                    
-                    l_m[nb,0]=np.log10(amp)
+                    l_m[nb,0,i]=np.log10(amp)
                     #anttrack[nb,0]=ant1
                     #anttrack[nb,1]=ant2
 
-                    script_L[nb,iant1]=1
-                    script_L[nb,iant2]=1
+                    script_L[nb,iant1,i]=1
+                    script_L[nb,iant2,i]=1
 
                     #PHASE STUFF
-                    theta_m[nb]=ph
+                    theta_m[nb,0,i]=ph
 
-                    if ant1==refant: Theta_r[nb,iant2-1]=-1
-                    if ant2==refant: Theta_r[nb,iant1]=1
+                    if ant1==refant: Theta_r[nb,iant2-1,i]=-1
+                    if ant2==refant: Theta_r[nb,iant1,i]=1
                     if ant1!=refant and ant1>refant:
-                        Theta_r[nb,iant1-1]=1
-                        Theta_r[nb,iant2-1]=-1
+                        Theta_r[nb,iant1-1,i]=1
+                        Theta_r[nb,iant2-1,i]=-1
                     if ant1!=refant and ant2<refant:
-                        Theta_r[nb,iant1]=1
-                        Theta_r[nb,iant2]=-1
+                        Theta_r[nb,iant1,i]=1
+                        Theta_r[nb,iant2,i]=-1
                     if (ant1!=refant and (ant2>refant and ant1<refant)):
-                        Theta_r[nb,iant1]=1
-                        Theta_r[nb,iant2-1]=-1
+                        Theta_r[nb,iant1,i]=1
+                        Theta_r[nb,iant2-1,i]=-1
                     nb+=1
     #here! yes here!    
     #print(script_L)
