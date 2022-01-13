@@ -39,6 +39,7 @@ print("data shape",visdata['data'].shape)
 ms.close()
 
 nant=len(np.unique(visdata['antenna1']))
+nbl=int(nant*(nant-1)/2)
 ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
 
 
@@ -53,6 +54,7 @@ antinfo=dict()
 antinfo['timestamp']=visdata['axis_info']['time_axis']['MJDseconds']
 
 allant=np.zeros((nant,ntimes),dtype=bool)
+alltim=np.zeros((ntimes,nant),dtype=bool)
 
 #tfdict for each time and whether ant good or bad
 #goodt=dict()
@@ -60,6 +62,7 @@ allant=np.zeros((nant,ntimes),dtype=bool)
 #XX correlation
 xx=visdata['data'][0]
 #tf matrix for where ant is bad (True)
+#tfdata=np.abs(visdata['data'])<=0
 tfdata=np.abs(xx)<=0
 print(tfdata)
 
@@ -72,7 +75,7 @@ for ant in np.unique(visdata['antenna1']):
     #pull all baselines for this ant at all times w/in tfdata
     allt1ant=tfdata[thisant][:]
     #printing number of baselines w/ this ant and all times to make sure right shape
-    print("allt1ant",allt1ant.shape)
+    #print("allt1ant",allt1ant.shape)
     #evaluating if baseline/antenna is bad at each time
     ant_tf=np.all(allt1ant,axis=0)
     #Adding to goodant
@@ -86,8 +89,8 @@ for ant in np.unique(visdata['antenna1']):
 
 antinfo['goodant']=allant
 
-'''   
-for i in range(len(visdata['axis_info']['time_axis']['MJDseconds'])):
+   
+for i in range(ntimes):
     j=0
     tfstore=np.zeros(len(np.unique(visdata['antenna1'])),dtype=bool)
     ct=visdata['axis_info']['time_axis']['MJDseconds'][i]
@@ -97,13 +100,43 @@ for i in range(len(visdata['axis_info']['time_axis']['MJDseconds'])):
         #print(goodant[ant][i])
         j+=1
     #print(tfstore)
-    goodt[ct]=tfstore
+    #allant[0,i]=tfstore
+    alltim[i,:]=tfstore
     #plt.plot(tfstore)
     #plotting and saving this
     #plt.savefig("./tfgraphs/time_tf_t%f.png"%(ELO[i]),overwrite=True)
     #plt.clf()
-'''
 
+antinfo['goodt']=alltim
+
+allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
+antlist=np.unique(allants)
+
+allgoodtime=0
+allbad=0
+good1=0
+
+nb=0
+
+nvis=[]
+
+#Cycling through all the times
+for time in antinfo['goodt']:
+    if np.any(time)==False: allgoodtime+=1
+    if np.any(time)==True:
+        nbad=np.count_nonzero(time)
+        if nbad==nant: allbad+=1
+        if nbad<nant: good1+=1
+
+#plt.plot(ELO,[0]*len(ELO))
+#plt.plot(ELO,[nbl]*len(ELO))
+#plt.show()
+
+
+#plt.savefig('ngood.png')
+print("All good antennas:",allgoodtime)
+print("Almost all good antennas:",good1)
+print("All ants bad:",allbad)
 
 #END OF DOCUMENTED UNIVERSE
 
@@ -119,59 +152,14 @@ for i in range(len(visdata['axis_info']['time_axis']['MJDseconds'])):
 
 #print(sbc)
 
-allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
-antlist=np.unique(allants)
 #print(antlist)
 
 #Calculating number of antennas and baselines
-nant=int(len(antlist))
-nbl=int(nant*(nant-1)/2)
+#nant=int(len(antlist))
 
 #print(nant)
 #print(nbl)
-allgoodtime=0
-good1=0
 
-nb=0
-
-nvis=[]
-
-#Cycling through all the times
-for time in tkeys:
-    thistime=(visdata['axis_info']['time_axis']['MJDseconds']==time)
-    bpt=[]
-    tf=np.array(ant_good_v[time])
-    #print(tf)
-    for ant1 in np.unique(visdata['antenna1']):
-        for ant2 in np.unique(visdata['antenna2']):
-            if ant1 < ant2:
-                thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
-                iant1=np.where(antlist==ant1)[0]
-                iant2=np.where(antlist==ant2)[0]
-                if thisbase.sum()>0:
-                    pt=visdata['data'][0][thisbase][0][thistime][0]
-                    bpt.append(pt)
-                    #ph=np.angle(pt,deg=True)
-                    #amp=np.absolute(pt)
-    bpt=np.array(bpt)
-    #print(len(bpt))
-    #print(np.where(tf==1))
-    #print(bpt[np.where(tf==0)])
-    ngood=len(bpt[np.where(tf==1)])
-    nvis.append(len(np.unique(np.array(ant1dict[time]))))
-    if ngood==nbl:
-        allgoodtime+=1
-    if ngood>1 and ngood<nbl:
-        good1+=1
-    #plt.scatter(time,len(np.array(ant1dict[time])))
-#plt.plot(ELO,[0]*len(ELO))
-#plt.plot(ELO,[nbl]*len(ELO))
-#plt.show()
-
-
-#plt.savefig('ngood.png')
-print("All good baselines:",badtime)
-print("Almost all good baseline:",good1)
 #plt.close()
 
 #for x in range(len(ant1dict)):
@@ -194,13 +182,13 @@ l_Ir_conv_dict={}
 smc=0
 
 
-for time in ELO:
+for i in range(len(antinfo['timestamp'])):
     #print(time)
-    if (time in tkeys)==False:continue
-    thistime=(visdata['axis_info']['time_axis']['MJDseconds']==time)
+    #if (time in tkeys)==False:continue
+    thistime=(visdata['axis_info']['time_axis']['MJDseconds']==antinfo['timestamp'][i])
 
-    alla1=ant1dict[time]
-    alla2=ant2dict[time]
+    #alla1=ant1dict[time]
+    #alla2=ant2dict[time]
 
     #print(alla1)
     #print(alla2)
@@ -208,17 +196,28 @@ for time in ELO:
     #print(visdata['antenna1'])
     #print(visdata['antenna2'])
 
-    allants=np.concatenate((alla1,alla2))
-    antlist=np.unique(allants)
+    gt=antinfo['goodt'][i]
+
+    #Pulling antennas that are bad for this time
+    badant=np.where(gt==True)
+    #print(badbase)
+    if len(badbase)!=0:
+        for ant in badbase:
+            thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
+            xx[thisant][thistime]=np.nan
+
+
+    #allants=np.concatenate((alla1,alla2))
+    #antlist=np.unique(allants)
     #print(alla1)
     #print(alla2)
 
 
     #Calculating number of antennas and baselines
     #-1 is to account for bad ants (ant1=-1 is not valid)
-    nant=int(len(antlist))
+    #nant=int(len(antlist))
     #if len(np.unique(alla2))==1: continue
-    nbl=int(nant*(nant-1)/2)
+    #nbl=int(nant*(nant-1)/2)
     #print(nbl)
     
     #Jacobian and measured phase matrix
