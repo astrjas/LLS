@@ -16,7 +16,7 @@ import gfunc as gf
 #thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
 
 #setting a dummy refant
-refant=0
+#refant=0
 
 #this is for Venki data
 target='sgr_apr07'
@@ -72,7 +72,7 @@ print(tfdata)
 #cycle through each ant
 a=0
 for ant in antlist:
-    print("ANT",ant)
+    #print("ANT",ant)
     #all baselines w/ this ant
     thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
     #pull all baselines for this ant at all times w/in tfdata
@@ -83,7 +83,7 @@ for ant in antlist:
     ant_tf=np.all(allt1ant,axis=0)
     #Adding to goodant
     allant[ant,:]=ant_tf
-    print("ant_tf",ant_tf.shape)
+    #print("ant_tf",ant_tf.shape)
     plt.plot(ant_tf)
     #plotting and saving this
     plt.savefig("./tfgraphs/ant_tf_ant%i.png"%(ant),overwrite=True)
@@ -97,7 +97,7 @@ for i in range(ntimes):
     j=0
     tfstore=np.zeros(len(antlist),dtype=bool)
     ct=visdata['axis_info']['time_axis']['MJDseconds'][i]
-    print("tstamp",ct)
+    #print("tstamp",ct)
     for ant in np.unique(visdata['antenna1']):
         tfstore[j]=allant[ant][i]
         #print(goodant[ant][i])
@@ -137,6 +137,9 @@ for time in antinfo['goodt']:
 print("All good antennas:",allgoodtime)
 print("Almost all good antennas:",good1)
 print("All ants bad:",allbad)
+
+#refant=gf.refantfinder(antlist=antlist,goodant=antinfo['goodant'])
+refant=0
 
 #END OF DOCUMENTED UNIVERSE
 
@@ -210,12 +213,14 @@ for i in range(len(antinfo['timestamp'])):
 
     #Pulling antennas that are bad for this time
     badant=np.where(gt==True)
+    #print(badant)
     #print(badbase)
     if len(badant)!=0:
-        for ant in badant:
+        for ant in badant[0]:
+            #print("ANT",ant)
             thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
             #replacing [thistime] with i, we'll see how it goes
-            xx[thisant][thistime]=np.nan
+            xx[:,i]=np.where(thisant==True,np.nan,xx[:,i])
 
     #xxnonan=xx[~np.isnan(xx)]
 
@@ -247,27 +252,27 @@ for i in range(len(antinfo['timestamp'])):
                     ph=np.angle(pt,deg=True)
                     amp=np.absolute(pt)
                     
-                    l_m[nb,0,i]=np.log10(amp)
+                    l_m[nb,0]=np.log10(amp)
                     #anttrack[nb,0]=ant1
                     #anttrack[nb,1]=ant2
 
-                    script_L[nb,iant1,i]=1
-                    script_L[nb,iant2,i]=1
+                    script_L[nb,iant1]=1
+                    script_L[nb,iant2]=1
 
                     #PHASE STUFF
-                    theta_m[nb,0,i]=ph
+                    theta_m[nb,0]=ph
 
-                    if ant1==refant: Theta_r[nb,iant2-1,i]=-1
-                    if ant2==refant: Theta_r[nb,iant1,i]=1
+                    if ant1==refant: Theta_r[nb,iant2-1]=-1
+                    if ant2==refant: Theta_r[nb,iant1]=1
                     if ant1!=refant and ant1>refant:
-                        Theta_r[nb,iant1-1,i]=1
-                        Theta_r[nb,iant2-1,i]=-1
+                        Theta_r[nb,iant1-1]=1
+                        Theta_r[nb,iant2-1]=-1
                     if ant1!=refant and ant2<refant:
-                        Theta_r[nb,iant1,i]=1
-                        Theta_r[nb,iant2,i]=-1
+                        Theta_r[nb,iant1]=1
+                        Theta_r[nb,iant2]=-1
                     if (ant1!=refant and (ant2>refant and ant1<refant)):
-                        Theta_r[nb,iant1,i]=1
-                        Theta_r[nb,iant2-1,i]=-1
+                        Theta_r[nb,iant1]=1
+                        Theta_r[nb,iant2-1]=-1
                     nb+=1
 
     #here! yes here!    
@@ -275,7 +280,7 @@ for i in range(len(antinfo['timestamp'])):
     #script_L_f=np.vstack([script_L[x] for x in range(len(script_L)) if len(np.unique(script_L[x]))>1])
     #l_m_f=np.vstack([l_m[x] for x in range(len(l_m)) if len(np.unique(script_L[x]))>1])
 
-    Theta_r=np.vstack([Theta_r[x] for x in range(len(Theta_r)) if len(np.unique(Theta_r[x]))>1])
+    #Theta_r=np.vstack([Theta_r[x] for x in range(len(Theta_r)) if len(np.unique(Theta_r[x]))>1])
     #print(Theta_r.shape)
     #print(Theta_r_f)
     #theta_m_f=np.vstack([theta_m[x] for x in range(len(theta_m)) if len(np.unique(Theta_r[x]))>1])
@@ -305,7 +310,7 @@ for i in range(len(antinfo['timestamp'])):
     #l_r=np.dstack([gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn[:,:,x]) for x in range(ntimes)])
 
     l_r=gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn)
-    print("l_r \n"+str(l_r))
+    #print("l_r \n"+str(l_r))
 
     
     #print("Theta_r \n"+str(Theta_r))
@@ -316,11 +321,11 @@ for i in range(len(antinfo['timestamp'])):
 
     #if len(theta_m)==1: theta_Ir=theta_m/Theta_r
     theta_Ir=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_m_nn)
-    print("theta_Ir \n"+str(theta_Ir))
+    #print("theta_Ir \n"+str(theta_Ir))
 
 
     #Residuals
-    l_del=l_m-np.matmul(script_L_nn,l_r)
+    l_del=l_m_nn-np.matmul(script_L_nn,l_r)
     #print("l_del \n"+str(l_del))
     gf.dict_update(l_del_dict,time,l_del)
     #print(l_del.shape)
@@ -348,16 +353,17 @@ for i in range(len(antinfo['timestamp'])):
     #    Ir_converted[:,:,t]=10.0**(l_Ir_final[:,:,t])
 
     Ir_converted=np.vstack([10.0**x for x in l_Ir_final])
+    print(Ir_converted)
     if np.isnan(Ir_converted[0])==True: 
         print("BREAK!")
-        print(alla1)
-        print(alla2)
-        print(script_L_f)
-        print(l_m_f)
+        #print(alla1)
+        #print(alla2)
+        print(script_L)
+        print(l_m)
         print(l_r)
         print("ph")
-        print(theta_m_f)
-        print(Theta_r_f)
+        print(theta_m)
+        print(Theta_r)
         #print(Theta_r)
         print(theta_Ir)
         break
@@ -385,6 +391,7 @@ ELO_range=np.linspace(np.min(ELO),np.max(ELO),nint)
 #print(l_Ir_conv_dict[0])
 
 fkeys=theta_Ir_dict.keys()
+tkeys=antinfo['timestamp']
 
 nonan=0
 nemp=0
@@ -396,12 +403,12 @@ nda=[]
 
 
 for t_step in range(len(ELO_range)-1):
-    datachunk_ph=len([theta_Ir_dict[tkeys[x]] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
+    datachunk_ph=np.mean([theta_Ir_dict[tkeys[x]] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
     ndp.append(datachunk_ph)
-    datachunk_amp=len([l_Ir_conv_dict[tkeys[x]] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
+    datachunk_amp=np.mean([l_Ir_conv_dict[tkeys[x]] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
     nda.append(datachunk_amp)
 
-    nd=len([ant1dict[tkeys[x]] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
+    nd=len([antinfo['timestamp'][x] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
 
  
     if datachunk_ph==0 or datachunk_amp==0:
@@ -410,18 +417,12 @@ for t_step in range(len(ELO_range)-1):
             nemp+=1
         else: 
             nbad+=1
+    else: nonan+=1
+
 
 
     print(datachunk_ph)
     print(datachunk_amp)
-    nonan+=1
-
-
-
-
-
-
-
 
 
 #where comments ended
@@ -434,16 +435,16 @@ for f in tkeys:
     if datachunk_ph==0 or datachunk_amp==0: continue 
     nonan+=1
 '''
-    
+#ELO_range[:-1]    
 plt.scatter(ELO_range[:-1],nda,label='amp',color='black',marker='x')
 plt.scatter(ELO_range[:-1],ndp,label='phase',color='red')
-plt.scatter(tkeys,nvis,label='vis',color='green',marker='*')
-plt.scatter(ELO_range,[nant]*len(ELO_range),label='vis',color='blue')
-plt.xlim(right=ELO_range[50])
+#plt.scatter(tkeys,nvis,label='vis',color='green',marker='*')
+#plt.scatter(ELO_range,[nant]*len(ELO_range),label='vis',color='blue')
+#plt.xlim(right=ELO_range[50])
 plt.legend()
 plt.show()
 
-plt.savefig('ndpv.png')
+plt.savefig('ndpv_01132021_refant0.png')
 
 print("Intervals with pts:",nonan)
 print("Total intervals:",len(ELO_range)-1)
