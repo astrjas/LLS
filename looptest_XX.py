@@ -406,13 +406,13 @@ avgp=np.empty((35,1,len(ELO_range)-1))
 for t_step in range(len(ELO_range)-1):
     nd=len([antinfo['timestamp'][x] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
     for k in range(nant):
-        avga[k,0,t_step]=np.mean([l_Ir_conv_dict[j][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+        avga[k,0,t_step]=np.mean([l_Ir_conv_dict[t_step][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
         if k==refant and nd!=0: 
             avgp[k,0,t_step]=0
         elif k<refant and nd!=0:
-            avgp[k,0,t_step]=np.mean([theta_Ir_dict[j][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+            avgp[k,0,t_step]=np.mean([theta_Ir_dict[t_step][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
         elif k>refant and nd!=0:
-            avgp[k,0,t_step]=np.mean([theta_Ir_dict[j][k-1] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+            avgp[k,0,t_step]=np.mean([theta_Ir_dict[t_step][k-1] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
 
  
     if np.isnan(np.mean(avga[:,0,t_step]))==True or np.isnan(np.mean(avgp[:,0,t_step]))==True:
