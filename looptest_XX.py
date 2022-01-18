@@ -138,8 +138,8 @@ print("All good antennas:",allgoodtime)
 print("Almost all good antennas:",good1)
 print("All ants bad:",allbad)
 
-#refant=gf.refantfinder(antlist=antlist,goodant=antinfo['goodant'])
-refant=0
+refant=gf.refantfinder(antlist=antlist,goodant=antinfo['goodant'])
+#refant=0
 
 #END OF DOCUMENTED UNIVERSE
 
@@ -198,7 +198,7 @@ for i in range(len(antinfo['timestamp'])):
     #print(time)
     #if (time in tkeys)==False:continue
     thistime=(visdata['axis_info']['time_axis']['MJDseconds']==antinfo['timestamp'][i])
-    time=antinfo['timestamp'][i]
+    time=i
 
     #alla1=ant1dict[time]
     #alla2=ant2dict[time]
@@ -353,7 +353,7 @@ for i in range(len(antinfo['timestamp'])):
     #    Ir_converted[:,:,t]=10.0**(l_Ir_final[:,:,t])
 
     Ir_converted=np.vstack([10.0**x for x in l_Ir_final])
-    print(Ir_converted)
+    #print(Ir_converted)
     if np.isnan(Ir_converted[0])==True: 
         print("BREAK!")
         #print(alla1)
@@ -400,8 +400,32 @@ nbad=0
 ndp=[]
 nda=[]
 
+avga=np.empty((35,1,len(ELO_range)-1))
+avgp=np.empty((35,1,len(ELO_range)-1))
 
+for t_step in range(len(ELO_range)-1):
+    nd=len([antinfo['timestamp'][x] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
+    for k in range(nant):
+        avga[k,0,t_step]=np.mean([l_Ir_conv_dict[j][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+        if k==refant and nd!=0: 
+            avgp[k,0,t_step]=0
+        elif k<refant and nd!=0:
+            avgp[k,0,t_step]=np.mean([theta_Ir_dict[j][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+        elif k>refant and nd!=0:
+            avgp[k,0,t_step]=np.mean([theta_Ir_dict[j][k-1] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
 
+ 
+    if np.isnan(np.mean(avga[:,0,t_step]))==True or np.isnan(np.mean(avgp[:,0,t_step]))==True:
+        if nd==0:
+            print("That's okay!")
+            nemp+=1
+        else: 
+            nbad+=1
+    else: nonan+=1
+
+    
+
+'''
 for t_step in range(len(ELO_range)-1):
     datachunk_ph=np.mean([theta_Ir_dict[tkeys[x]] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
     ndp.append(datachunk_ph)
@@ -423,7 +447,7 @@ for t_step in range(len(ELO_range)-1):
 
     print(datachunk_ph)
     print(datachunk_amp)
-
+'''
 
 #where comments ended
 '''
@@ -435,22 +459,26 @@ for f in tkeys:
     if datachunk_ph==0 or datachunk_amp==0: continue 
     nonan+=1
 '''
-#ELO_range[:-1]    
-plt.scatter(ELO_range[:-1],nda,label='amp',color='black',marker='x')
-plt.scatter(ELO_range[:-1],ndp,label='phase',color='red')
+#ELO_range[:-1]
+    
+#plt.scatter(ELO_range[:-1],nda,label='amp',color='black',marker='x')
+#plt.scatter(ELO_range[:-1],ndp,label='phase',color='red')
 #plt.scatter(tkeys,nvis,label='vis',color='green',marker='*')
 #plt.scatter(ELO_range,[nant]*len(ELO_range),label='vis',color='blue')
 #plt.xlim(right=ELO_range[50])
+for a in range(nant):
+    plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
+    plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
 plt.legend()
 plt.show()
 
-plt.savefig('ndpv_01132021_refant0.png')
+plt.savefig('ndpv_01182021_refantfunc_1.png')
 
 print("Intervals with pts:",nonan)
 print("Total intervals:",len(ELO_range)-1)
 print("Bad baseline/antenna cases",nbad)
 print("Empty bins",nemp)
-print("Total points:",len(ELO))
+print("Total points:",len(antinfo['timestamp']))
 
 
 '''
