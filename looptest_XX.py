@@ -21,22 +21,37 @@ import gfunc as gf
 #this is for Venki data
 target='sgr_apr07'
 
+#for image names
+case='shift5'
+auth='Venki'
+refmeth='refanctfunc'
+date='01252021'
+
+#datams0='firstintflag_QSOB19.ms'
+#os.system('rm -rf QSOB19_chanavg.ms')
+#split(vis=datams0,outputvis='QSOB19_chanavg.ms',width=240,datacolumn='data')
+
 #Initial data file name and name for channel-averaged file
-#datams1=target+'_flagcor.ms'
-datams1='Sagittarius_A_star_C.ms_CALIBRATED_SELFCAL'
+datams1=target+'_flagcor.ms'
+#datams1='Sagittarius_A_star_C.ms_CALIBRATED_SELFCAL'
 #datams1='uvmfit_3d77_SGRA_onechan.ms'
+#datams1='QSOB19_chanavg.ms'
 
 #Opening data and pulling necessary info
 ms.open(datams1,nomodify=True)
 ms.selectinit(reset=True)
-visdata = ms.getdata(['antenna1','antenna2','data','axis_info'],ifraxis=True)
+visdata = ms.getdata(['antenna1','antenna2','data','axis_info','flag'],ifraxis=True)
 #printing correlations
 print(visdata['axis_info']['corr_axis'])
 
 #Squeeze data then close ms
+visdata['data'] = np.where(visdata['flag']==True,np.nan,visdata['data'])
+
 visdata['data'] = np.squeeze(visdata['data'])
 print("data shape",visdata['data'].shape)
 ms.close()
+
+
 
 allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
 antlist=np.unique(allants)
@@ -71,7 +86,7 @@ print(tfdata)
 
 #cycle through each ant
 a=0
-for ant in antlist:
+for ant in range(nant):
     #print("ANT",ant)
     #all baselines w/ this ant
     thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
@@ -98,7 +113,8 @@ for i in range(ntimes):
     tfstore=np.zeros(len(antlist),dtype=bool)
     ct=visdata['axis_info']['time_axis']['MJDseconds'][i]
     #print("tstamp",ct)
-    for ant in np.unique(visdata['antenna1']):
+    for ant in range(nant):
+    #np.unique(visdata['antenna1']):
         tfstore[j]=allant[ant][i]
         #print(goodant[ant][i])
         j+=1
@@ -259,6 +275,14 @@ for i in range(len(antinfo['timestamp'])):
                     script_L[nb,iant1]=1
                     script_L[nb,iant2]=1
 
+
+                    if iant1==5: 
+                        ph+=90
+                        #print("bing")
+                    if iant2==5: 
+                        ph-=90
+                        #print("bong")
+
                     #PHASE STUFF
                     theta_m[nb,0]=ph
 
@@ -400,8 +424,25 @@ nbad=0
 ndp=[]
 nda=[]
 
-avga=np.empty((35,1,len(ELO_range)-1))
-avgp=np.empty((35,1,len(ELO_range)-1))
+avga=np.empty((nant,1,len(ELO_range)-1))
+avgp=np.empty((nant,1,len(ELO_range)-1))
+
+phase_arr=np.zeros((nant,1,ntimes))
+amp_arr=np.zeros((nant,1,ntimes))
+
+
+for t_step in range(ntimes):
+    for k in range(nant):
+        amp_arr[k,0,t_step]=l_Ir_conv_dict[t_step][k]
+        if k==refant: 
+            phase_arr[k,0,t_step]=0
+        elif k<refant:
+            phase_arr[k,0,t_step]=theta_Ir_dict[t_step][k]
+        elif k>refant:
+            phase_arr[k,0,t_step]=theta_Ir_dict[t_step][k-1]
+
+antinfo['phase']=np.squeeze(phase_arr)
+antinfo['amp']=np.squeeze(amp_arr)
 
 for t_step in range(len(ELO_range)-1):
     nd=len([antinfo['timestamp'][x] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
@@ -418,6 +459,8 @@ for t_step in range(len(ELO_range)-1):
     if np.isnan(np.mean(avga[:,0,t_step]))==True or np.isnan(np.mean(avgp[:,0,t_step]))==True:
         if nd==0:
             print("That's okay!")
+            avga[:,0,t_step]=np.nan
+            avgp[:,0,t_step]=np.nan
             nemp+=1
         else: 
             nbad+=1
@@ -465,14 +508,56 @@ for f in tkeys:
 #plt.scatter(ELO_range[:-1],ndp,label='phase',color='red')
 #plt.scatter(tkeys,nvis,label='vis',color='green',marker='*')
 #plt.scatter(ELO_range,[nant]*len(ELO_range),label='vis',color='blue')
-#plt.xlim(right=ELO_range[50])
+#plt.ylim(top=2,bottom=-2)
 for a in range(nant):
     plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
     plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
 plt.legend()
 plt.show()
 
-plt.savefig('ndpv_01182021_refantfunc_1.png')
+plt.savefig('ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+'.png')
+
+plt.clf()
+
+#plt.ylim(top=2,bottom=-2)
+for a in range(nant):
+    plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
+plt.legend()
+plt.show()
+
+plt.savefig('ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+'.png')
+
+
+plt.clf()
+
+#plt.ylim(top=2,bottom=-2)
+for a in range(nant):
+    plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
+plt.legend()
+plt.show()
+
+plt.savefig('ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+'.png')
+
+plt.clf()
+
+for a in range(nant):
+    plt.scatter(antinfo['timestamp'],antinfo['amp'][a],color='black',marker='x')
+plt.legend()
+plt.show()
+
+plt.savefig('ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+'.png')
+
+plt.clf()
+
+for a in range(nant):
+    plt.scatter(antinfo['timestamp'],antinfo['phase'][a],color='red')
+plt.legend()
+plt.show()
+
+plt.savefig('ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+'.png')
+
+plt.clf()
+
 
 print("Intervals with pts:",nonan)
 print("Total intervals:",len(ELO_range)-1)
