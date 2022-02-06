@@ -22,20 +22,20 @@ import gfunc as gf
 target='sgr_apr07'
 
 #for image names
-case='shift5'
-auth='Venki'
+case='noshift'
+auth='ALMA'
 refmeth='refanctfunc'
-date='01252021'
+date='02062022'
 
-#datams0='firstintflag_QSOB19.ms'
-#os.system('rm -rf QSOB19_chanavg.ms')
-#split(vis=datams0,outputvis='QSOB19_chanavg.ms',width=240,datacolumn='data')
+datams0='firsttwointflag_QSOB19.ms'
+os.system('rm -rf QSOB19_chanavg.ms')
+split(vis=datams0,outputvis='QSOB19_chanavg.ms',width=240,datacolumn='data')
 
 #Initial data file name and name for channel-averaged file
-datams1=target+'_flagcor.ms'
+#datams1=target+'_flagcor.ms'
 #datams1='Sagittarius_A_star_C.ms_CALIBRATED_SELFCAL'
 #datams1='uvmfit_3d77_SGRA_onechan.ms'
-#datams1='QSOB19_chanavg.ms'
+datams1='QSOB19_chanavg.ms'
 
 #Opening data and pulling necessary info
 ms.open(datams1,nomodify=True)
@@ -276,11 +276,11 @@ for i in range(len(antinfo['timestamp'])):
                     script_L[nb,iant2]=1
 
 
-                    if iant1==5: 
-                        ph+=90
+                    #if iant1==5: 
+                        #ph+=90
                         #print("bing")
-                    if iant2==5: 
-                        ph-=90
+                    #if iant2==5: 
+                        #ph-=90
                         #print("bong")
 
                     #PHASE STUFF
@@ -466,7 +466,8 @@ for t_step in range(len(ELO_range)-1):
             nbad+=1
     else: nonan+=1
 
-    
+antinfo['avg_phase']=np.squeeze(avgp)
+antinfo['avg_amp']=np.squeeze(avga)    
 
 '''
 for t_step in range(len(ELO_range)-1):
@@ -564,6 +565,86 @@ print("Total intervals:",len(ELO_range)-1)
 print("Bad baseline/antenna cases",nbad)
 print("Empty bins",nemp)
 print("Total points:",len(antinfo['timestamp']))
+
+newpt=np.zeros_like(l_m)
+
+nb1=0
+tb1=0
+
+for time in ELO:
+    thistime=(visdata['axis_info']['time_axis']['MJDseconds']==time)
+    itime=np.where(ELO==time)[0]
+    #print(itime)
+    subset=visdata['data'][0]
+    #print(subset.shape)
+    #print("split")
+    #print(visdata['data'][0,:][subset!=0].shape)
+    rsize=arr_length(visdata=visdata,ELO=ELO,curr_time=time)
+    #print("RSIZE")
+    #print(rsize)
+    if rsize<nbl:continue
+
+    #script_L=np.zeros((rsize,nant),dtype=int)
+    #l_m=np.zeros((rsize,1),dtype=float)
+
+    #script_L=np.zeros((nbl,nant),dtype=int)
+    #l_m=np.zeros((nbl,1),dtype=float)
+
+    igtime=np.where(goodtimes==itime)
+    nb1=0
+
+    for ant1 in np.unique(visdata['antenna1']):
+        for ant2 in np.unique(visdata['antenna2']):
+            if ant1 < ant2:
+                thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
+                iant1=np.where(antlist==ant1)[0]
+                iant2=np.where(antlist==ant2)[0]
+                #print(iant1)
+                #print(iant2)
+                if thisbase.sum()>0:
+                    #print("length!")
+                    #print(visdata['data'][0][thisbase][0][thistime][0])
+                    pt=visdata['data'][0][thisbase][0][thistime][0]
+                    #print(type(pt))
+                    newpt[nb1,0,tb1]=pt.real/(Ir_converted[iant1,0,igtime]*Ir_converted[iant2,0,igtime])
+
+                    nb1+=1
+    tb1+=1
+
+print(newpt)
+
+for t in range(tsize):
+    plt.scatter(range(nb1),newpt[:,0,t])
+
+
+
+
+
+
+
+
+
+for t_step in range(len(ELO_range)-1):
+    nd=len([antinfo['timestamp'][x] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
+    for k in range(nant):
+        avga[k,0,t_step]=np.mean([l_Ir_conv_dict[t_step][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+        if k==refant and nd!=0: 
+            avgp[k,0,t_step]=0
+        elif k<refant and nd!=0:
+            avgp[k,0,t_step]=np.mean([theta_Ir_dict[t_step][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+        elif k>refant and nd!=0:
+            avgp[k,0,t_step]=np.mean([theta_Ir_dict[t_step][k-1] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+
+ 
+    if np.isnan(np.mean(avga[:,0,t_step]))==True or np.isnan(np.mean(avgp[:,0,t_step]))==True:
+        if nd==0:
+            print("That's okay!")
+            avga[:,0,t_step]=np.nan
+            avgp[:,0,t_step]=np.nan
+            nemp+=1
+        else: 
+            nbad+=1
+    else: nonan+=1
 
 
 '''
