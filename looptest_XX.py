@@ -45,7 +45,7 @@ visdata = ms.getdata(['antenna1','antenna2','data','axis_info','flag'],ifraxis=T
 print(visdata['axis_info']['corr_axis'])
 
 #Squeeze data then close ms
-visdata1 = np.where(visdata['flag']==True,np.nan,visdata['data'])
+visdata['data'] = np.where(visdata['flag']==True,np.nan,visdata['data'])
 
 visdata['data'] = np.squeeze(visdata['data'])
 print("data shape",visdata['data'].shape)
@@ -81,8 +81,8 @@ alltim=np.zeros((ntimes,nant),dtype=bool)
 xx=visdata['data'][0]
 #tf matrix for where ant is bad (True)
 #tfdata=np.abs(visdata['data'])<=0
-tfdata=np.abs(xx)<=0
-#tfdata=np.isfinite(xx)
+#tfdata=np.abs(xx)<=0
+tfdata=np.isnan(xx)
 print(tfdata)
 
 #cycle through each ant
