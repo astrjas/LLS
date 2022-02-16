@@ -6,6 +6,10 @@ import os.path
 from os import path
 import sys
 import numpy as np
+path_to_gfunc='.'
+sys.path.insert(0, path_to_gfunc)
+import gfunc as gf
+
 
 #Setting default value for TCLEAN stopcode
 stop=0
@@ -187,7 +191,8 @@ g.write("it scan ext mod moderr\n")
 #Start with first iteration
 it=0
 
-refant=35 #DV20 index
+#refant=35 #DV20 index
+
 
 #The wily (formerly) infinite while loop
 #while(1):
