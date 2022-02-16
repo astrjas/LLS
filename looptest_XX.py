@@ -22,20 +22,26 @@ import gfunc as gf
 target='sgr_apr07'
 
 #for image names
-case='noshift'
-auth='Venki'
+case='ampshift_noflag'
+auth='ALMA'
 refmeth='refanctfunc'
-date='02062022'
+date='02162022'
 
-#datams0='firsttwointflag_QSOB19.ms'
-#os.system('rm -rf QSOB19_chanavg.ms')
-#split(vis=datams0,outputvis='QSOB19_chanavg.ms',width=240,datacolumn='data')
+datams0='firsttwointflag_QSOB19.ms'
+os.system('rm -rf QSOB19_chanavg.ms')
+split(vis=datams0,outputvis='QSOB19_chanavg.ms',width=240,datacolumn='data')
 
 #Initial data file name and name for channel-averaged file
-datams1=target+'_flagcor.ms'
-#datams1='Sagittarius_A_star_C.ms_CALIBRATED_SELFCAL'
-#datams1='uvmfit_3d77_SGRA_onechan.ms'
-#datams1='QSOB19_chanavg.ms'
+#datams2=target+'_flagcor.ms'
+#datams2='Sagittarius_A_star_C.ms_CALIBRATED_SELFCAL'
+#datams2='uvmfit_3d77_SGRA_onechan.ms'
+datams2='QSOB19_chanavg.ms'
+
+flagfile=datams2[:-3]+'_noflags.ms'
+os.system('rm -rf '+flagfile)
+split(vis=datams2,outputvis=flagfile,keepflags=False,datacolumn='data')
+
+datams1=flagfile
 
 #Opening data and pulling necessary info
 ms.open(datams1,nomodify=True)
@@ -213,6 +219,11 @@ for i in range(len(antinfo['timestamp'])):
                     ph=np.angle(pt,deg=True)
                     amp=np.absolute(pt)
                     
+                    #if iant1==5 or iant2==5:
+                        #amp/=2
+                        #ph+=90
+                        #print("bing")
+
                     l_m[nb,0]=np.log10(amp)
                     #anttrack[nb,0]=ant1
                     #anttrack[nb,1]=ant2
@@ -220,13 +231,6 @@ for i in range(len(antinfo['timestamp'])):
                     script_L[nb,iant1]=1
                     script_L[nb,iant2]=1
 
-
-                    #if iant1==5: 
-                        #ph+=90
-                        #print("bing")
-                    #if iant2==5: 
-                        #ph-=90
-                        #print("bong")
 
                     #PHASE STUFF
                     theta_m[nb,0]=ph
@@ -348,8 +352,8 @@ nda=[]
 avga=np.empty((nant,1,len(ELO_range)-1))
 avgp=np.empty((nant,1,len(ELO_range)-1))
 
-phase_arr=np.zeros((nant,1,ntimes))
-amp_arr=np.zeros((nant,1,ntimes))
+phase_arr=np.zeros((nant,1,ntimes),dtype=float)
+amp_arr=np.zeros((nant,1,ntimes),dtype=float)
 
 
 for t_step in range(ntimes):
@@ -399,7 +403,7 @@ for a in range(nant):
 plt.legend()
 plt.show()
 
-plt.savefig('ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+'.png')
+plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+'.png')
 
 plt.clf()
 
@@ -409,7 +413,7 @@ for a in range(nant):
 plt.legend()
 plt.show()
 
-plt.savefig('ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+'.png')
+plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+'.png')
 
 
 plt.clf()
@@ -420,7 +424,7 @@ for a in range(nant):
 plt.legend()
 plt.show()
 
-plt.savefig('ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+'.png')
+plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+'.png')
 
 plt.clf()
 
@@ -429,7 +433,7 @@ for a in range(nant):
 plt.legend()
 plt.show()
 
-plt.savefig('ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+'.png')
+plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+'.png')
 
 plt.clf()
 
@@ -438,7 +442,7 @@ for a in range(nant):
 plt.legend()
 plt.show()
 
-plt.savefig('ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+'.png')
+plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+'.png')
 
 plt.clf()
 
@@ -508,12 +512,14 @@ for t in range(tsize):
 
 
 
-newpt=np.zeros_like(xx)
+newpt=np.zeros((nbl,ntimes),dtype=float)
+oldpt=np.zeros((nbl,ntimes),dtype=float)
+tb1=0
 
 for t_step in range(len(ELO_range)-1):
     tchunk=[antinfo['timestamp'][x] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])]
-    nb1=0
-    tb1=0
+    #nb1=0
+    #tb1=0
     for i in range(len(tchunk)):
         #for k in range(len(vischunk)):
         thistime=(visdata['axis_info']['time_axis']['MJDseconds']==tchunk[i])
@@ -532,7 +538,7 @@ for t_step in range(len(ELO_range)-1):
 
         #Calculating number of antennas and baselines
         #-1 is to account for bad ants (ant1=-1 is not valid)    
-        nb=0
+        nb1=0
         for ant1 in np.unique(visdata['antenna1']):
             for ant2 in np.unique(visdata['antenna2']):
                 if ant1 < ant2:
@@ -544,23 +550,28 @@ for t_step in range(len(ELO_range)-1):
                     if thisbase.sum()>0:
                         #potential 0 after thisbase and thistime
                         pt=xx[thisbase][0][i]
+                        oldpt[nb1,tb1]=pt
                         ga1=antinfo['avg_amp'][iant1][t_step]
                         ga2=antinfo['avg_amp'][iant2][t_step]
                         if iant1==iref: 
-                            gp1=0
+                            gp1=0.
                         else:
                             gp1=antinfo['avg_phase'][iant1][t_step]
                         if iant2==iref:
-                            gp2=0
+                            gp2=0.
                         else:
                             gp2=antinfo['avg_phase'][iant2][t_step]
-                        newpt[nb1,tb1]=pt/(ga1*ga2*np.exp(1j*(gp1-gp2)))
+                        newpt[nb1,tb1]=pt/(ga1*ga2*np.exp(1.0j*(gp1-gp2)))
                         nb1+=1
         tb1+=1
 
-for t in range(ntimes):
-    plt.scatter(range(nb1),newpt[:,t])
-    plt.scatter(range(nb1),xx[:,t])
+oldpt1 = np.where(np.isnan(oldpt)==True,0.0,oldpt)
+newpt1 = np.where(np.isnan(newpt)==True,0.0,newpt)
+
+for t in range(nb1):
+    plt.scatter(range(tb1),newpt1[t,:])
+    plt.scatter(range(tb1),oldpt1[t,:])
+    #plt.scatter(range(tb1),oldpt1[t,:]-newpt1[t,:])
 
 
 #END OF DOCUMENTED UNIVERSE
