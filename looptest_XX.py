@@ -22,20 +22,20 @@ import gfunc as gf
 target='sgr_apr07'
 
 #for image names
-case='ampshift_noflag'
-auth='ALMA'
+case='noshift_noflag'
+auth='Venki'
 refmeth='refanctfunc'
-date='02162022'
+date='04032022'
 
-datams0='firsttwointflag_QSOB19.ms'
-os.system('rm -rf QSOB19_chanavg.ms')
-split(vis=datams0,outputvis='QSOB19_chanavg.ms',width=240,datacolumn='data')
+#datams0='firsttwointflag_QSOB19.ms'
+#os.system('rm -rf QSOB19_chanavg.ms')
+#split(vis=datams0,outputvis='QSOB19_chanavg.ms',width=240,datacolumn='data')
 
 #Initial data file name and name for channel-averaged file
-#datams2=target+'_flagcor.ms'
+datams2=target+'_flagcor.ms'
 #datams2='Sagittarius_A_star_C.ms_CALIBRATED_SELFCAL'
 #datams2='uvmfit_3d77_SGRA_onechan.ms'
-datams2='QSOB19_chanavg.ms'
+#datams2='QSOB19_chanavg.ms'
 
 flagfile=datams2[:-3]+'_noflags.ms'
 os.system('rm -rf '+flagfile)
@@ -51,13 +51,11 @@ visdata = ms.getdata(['antenna1','antenna2','data','axis_info','flag'],ifraxis=T
 print(visdata['axis_info']['corr_axis'])
 
 #Squeeze data then close ms
-visdata['data'] = np.where(visdata['flag']==True,np.nan,visdata['data'])
+#visdata['data'] = np.where(visdata['flag']==True,np.nan,visdata['data'])
 
 visdata['data'] = np.squeeze(visdata['data'])
 print("data shape",visdata['data'].shape)
 ms.close()
-
-
 
 allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
 antlist=np.unique(allants)
@@ -73,6 +71,52 @@ print(len(ELO))
 print(len(visdata['axis_info']['time_axis']['MJDseconds']))
 #print([x-ELO[0] for x in ELO])
 
+allant=np.zeros((nant,ntimes),dtype=bool)
+alltim=np.zeros((ntimes,nant),dtype=bool)
+
+lp=visdata['data'][0]<0.1
+#lp=np.zeros_like(visdata['data'][0])
+#lp=np.where(visdata['data']<0.1,np.nan,visdata['data'])
+#xx[:,i]=np.where(thisant==True,np.nan,xx[:,i])
+
+tt=np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)
+
+#cycle through each ant
+#a=0
+for ant in antlist:
+    #print("ANT",ant)
+    #all baselines w/ this ant
+    iant=np.where(antlist==ant)[0][0]
+    thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
+    
+    #pull all baselines for this ant at all times w/in tfdata
+    allt1ant=lp[thisant][:]
+    #printing number of baselines w/ this ant and all times to make sure right shape
+    #print("allt1ant",allt1ant.shape)
+    #evaluating if baseline/antenna is bad at each time
+    ant_tf=np.all(allt1ant,axis=0)
+    #Adding to goodant
+    allant[iant,:]=ant_tf
+    #print("ant_tf",ant_tf.shape)
+    plt.plot(ant_tf)
+    #plotting and saving this
+    plt.savefig("./lpgraphs/ant_tf_ant%i.png"%(ant),overwrite=True)
+    plt.clf()
+    #a+=1
+
+#antinfo['goodant']=allant
+
+#lp1=np.zeros_like(lp)
+lp1=np.where(lp==True,np.nan,visdata['data'])
+
+'''
+for y in range(741):
+    #pp=np.array(visdata['data'][0,y],dtype=float)
+    pp1=np.array(lp1[0,y],dtype=float)
+    #plt.scatter(tt,pp)
+    plt.scatter(tt,pp1)
+'''
+
 #Creating a tf dictionary for each ant and whether time is good or bad there
 antinfo=dict()
 antinfo['timestamp']=visdata['axis_info']['time_axis']['MJDseconds']
@@ -83,8 +127,20 @@ alltim=np.zeros((ntimes,nant),dtype=bool)
 #tfdict for each time and whether ant good or bad
 #goodt=dict()
 
+
+#TENTATIVE BEGINNING OF WHAT WILL BE IN MASSIVE LOOP
 #XX correlation
-xx=visdata['data'][0]
+xx0=visdata['data'][0]
+bd=xx0<=0.5
+xx=np.where(bd==True,np.nan,xx0)
+print("xxshape",xx.shape)
+
+for y in range(741):
+    #pp=np.array(visdata['data'][0,y],dtype=float)
+    pp1=np.array(xx[y],dtype=float)
+    #plt.scatter(tt,pp)
+    plt.scatter(tt,pp1)
+
 #tf matrix for where ant is bad (True)
 #tfdata=np.abs(visdata['data'])<=0
 #tfdata=np.abs(xx)<=0
@@ -177,7 +233,7 @@ l_Ir_conv_dict={}
 smc=0
 
 for i in range(len(antinfo['timestamp'])):
-
+    #print(antinfo['timestamp'][i])
     #Jacobian and measured phase matrix
     Theta_r=np.zeros((nbl,nant-1),dtype=int)
     theta_m=np.zeros((nbl,1),dtype=float)
@@ -569,10 +625,10 @@ oldpt1 = np.where(np.isnan(oldpt)==True,0.0,oldpt)
 newpt1 = np.where(np.isnan(newpt)==True,0.0,newpt)
 
 for t in range(nb1):
-    plt.scatter(range(tb1),newpt1[t,:])
-    plt.scatter(range(tb1),oldpt1[t,:])
+    #plt.scatter(antinfo['timestamp'],np.abs(newpt1[t,:]))
+    plt.scatter(antinfo['timestamp'],oldpt1[t,:])
     #plt.scatter(range(tb1),oldpt1[t,:]-newpt1[t,:])
-
+plt.savefig("./dplots/visplot_"+auth+date+".png",overwrite=True)
 
 #END OF DOCUMENTED UNIVERSE
 
