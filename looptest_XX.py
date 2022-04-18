@@ -25,7 +25,7 @@ target='sgr_apr07'
 case='noshift_noflag'
 auth='Venki'
 refmeth='refanctfunc'
-date='04032022'
+date='04182022'
 
 #datams0='firsttwointflag_QSOB19.ms'
 #os.system('rm -rf QSOB19_chanavg.ms')
@@ -40,6 +40,10 @@ datams2=target+'_flagcor.ms'
 flagfile=datams2[:-3]+'_noflags.ms'
 os.system('rm -rf '+flagfile)
 split(vis=datams2,outputvis=flagfile,keepflags=False,datacolumn='data')
+
+#sweepfile=flagfile[:-3]+'_nansweep.ms'
+#os.system('rm -rf '+sweepfile)
+#split(vis=flagfile,outputvis=sweepfile,datacolumn='data')
 
 datams1=flagfile
 
@@ -64,7 +68,6 @@ nant=len(antlist)
 nbl=int(nant*(nant-1)/2)
 ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
 
-
 #Pulling all unique timestamps, print its length and then all times
 ELO=np.unique(visdata['axis_info']['time_axis']['MJDseconds'])
 print(len(ELO))
@@ -80,6 +83,21 @@ lp=visdata['data'][0]<0.1
 #xx[:,i]=np.where(thisant==True,np.nan,xx[:,i])
 
 tt=np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)
+
+#nansweep=np.zeros_like(visdata['data'][0])
+#lowpt=np.abs(visdata['data'][0]<0.1)
+#nansweep=np.where(lowpt==True,np.nan,visdata['data'][0])
+#datams1=sweepfile
+
+#dtest=nansweep
+
+#for y in range(741):
+    #pp=np.array(visdata['data'][0,y],dtype=float)
+    #dd1=np.array(dtest[y])
+    #plt.scatter(tt,pp)
+    #plt.scatter(tt,np.abs(dd1))
+#plt.show()
+
 
 #cycle through each ant
 #a=0
@@ -130,16 +148,21 @@ alltim=np.zeros((ntimes,nant),dtype=bool)
 
 #TENTATIVE BEGINNING OF WHAT WILL BE IN MASSIVE LOOP
 #XX correlation
-xx0=visdata['data'][0]
-bd=xx0<=0.5
-xx=np.where(bd==True,np.nan,xx0)
+xx=np.zeros_like(visdata['data'][0])
+lowpt=np.abs(visdata['data'][0]<0.1)
+#bd=xx0<=-1.0
+xx=np.where(lowpt==True,np.nan,visdata['data'][0])
+#autocorr=visdata['antenna1']==visdata['antenna2']
 print("xxshape",xx.shape)
 
-for y in range(741):
+for y in range(nbl):
     #pp=np.array(visdata['data'][0,y],dtype=float)
-    pp1=np.array(xx[y],dtype=float)
+    pp1=np.array(xx[y])
     #plt.scatter(tt,pp)
-    plt.scatter(tt,pp1)
+    plt.scatter(tt,np.abs(pp1))
+plt.show()
+plt.savefig('datatestplot_'+auth+refmeth+'_'+date+'.png',overwrite=True)
+plt.clf()
 
 #tf matrix for where ant is bad (True)
 #tfdata=np.abs(visdata['data'])<=0
@@ -246,7 +269,7 @@ for i in range(len(antinfo['timestamp'])):
     #print(time)
     thistime=(visdata['axis_info']['time_axis']['MJDseconds']==antinfo['timestamp'][i])
     time=i
-
+    '''
     gt=antinfo['goodt'][i]
 
     #Pulling antennas that are bad for this time
@@ -257,7 +280,7 @@ for i in range(len(antinfo['timestamp'])):
             thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
             #replacing [thistime] with i, we'll see how it goes
             xx[:,i]=np.where(thisant==True,np.nan,xx[:,i])
-
+    '''
     #Calculating number of antennas and baselines
     #-1 is to account for bad ants (ant1=-1 is not valid)    
     nb=0
@@ -568,8 +591,12 @@ for t in range(tsize):
 
 
 
-newpt=np.zeros((nbl,ntimes),dtype=float)
-oldpt=np.zeros((nbl,ntimes),dtype=float)
+#newpt=np.zeros((nbl,ntimes),dtype=float)
+#oldpt=np.zeros((nbl,ntimes),dtype=float)
+newpt=np.zeros_like(xx)
+
+#oldpt=np.zeros_like(xx)
+#oldpt=(
 tb1=0
 
 for t_step in range(len(ELO_range)-1):
@@ -582,8 +609,9 @@ for t_step in range(len(ELO_range)-1):
         time=i
 
         gt=antinfo['goodt'][i]
-
+    
         #Pulling antennas that are bad for this time
+        '''
         badant=np.where(gt==True)
         if len(badant)!=0:
             for ant in badant[0]:
@@ -591,7 +619,7 @@ for t_step in range(len(ELO_range)-1):
                 thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
                 #replacing [thistime] with i, we'll see how it goes
                 xx[:,i]=np.where(thisant==True,np.nan,xx[:,i])
-
+        '''
         #Calculating number of antennas and baselines
         #-1 is to account for bad ants (ant1=-1 is not valid)    
         nb1=0
@@ -621,12 +649,16 @@ for t_step in range(len(ELO_range)-1):
                         nb1+=1
         tb1+=1
 
-oldpt1 = np.where(np.isnan(oldpt)==True,0.0,oldpt)
+oldpt1 = np.where(np.isnan(oldpt)==True,-1.0,oldpt)
 newpt1 = np.where(np.isnan(newpt)==True,0.0,newpt)
 
 for t in range(nb1):
     #plt.scatter(antinfo['timestamp'],np.abs(newpt1[t,:]))
-    plt.scatter(antinfo['timestamp'],oldpt1[t,:])
+    oldp=np.array(xx[t])
+    newp=np.array(newpt[t])
+    #plt.scatter(antinfo['timestamp'],np.abs(op))
+    plt.scatter(antinfo['timestamp'],np.abs(oldp))
+    plt.scatter(antinfo['timestamp'],np.abs(newp))
     #plt.scatter(range(tb1),oldpt1[t,:]-newpt1[t,:])
 plt.savefig("./dplots/visplot_"+auth+date+".png",overwrite=True)
 
