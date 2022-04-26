@@ -20,7 +20,7 @@ start=time.time()
 target='sgr_apr07'
 
 #Initial data file name and name for channel-averaged file
-datams1=target+'_flagcor.ms'
+datams1=target+'_flagcor_noflags.ms'
 
 #Getting file name
 dmsprefix=datams1[:-3]
@@ -47,6 +47,7 @@ os.system('rm -rf '+dmsprefix+'_selfcal*_ext_it*.ms')
 os.system('rm -rf '+dmsprefix+'_selfcal*_mod_it*.ms')
 os.system('rm -rf '+dmsprefix+'_selfcal*_ext2_it*.ms')
 
+'''
 def l_Ir(ll_r,ll_m):
     print("ll_r")
     print(ll_r)
@@ -105,23 +106,34 @@ def t_length(visdata,ELO,nbl):
             gt.append(itime)
     gt=np.hstack(gt)
     return tl,gt
-
+'''
 
 ms.open(datams1,nomodify=True)
 visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id','sigma','axis_info'],ifraxis=True)
 visdata['data'] = np.squeeze(visdata['data'])
 ms.close()
 
+
 allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
 antlist=np.unique(allants)
-#print(antlist)
+
+print(antlist)
 
 #Calculating number of antennas and baselines
 nant=int(len(antlist))
 nbl=int(nant*(nant-1)/2)
+ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
 
 print(nant)
 print(nbl)
+
+
+#Creating a tf dictionary for each ant and whether time is good or bad there
+antinfo=dict()
+antinfo['timestamp']=visdata['axis_info']['time_axis']['MJDseconds']
+
+allant=np.zeros((nant,ntimes),dtype=bool)
+alltim=np.zeros((ntimes,nant),dtype=bool)
 
 
 print(len(visdata['axis_info']['time_axis']['MJDseconds']))
@@ -134,9 +146,9 @@ ELO=np.unique(visdata['axis_info']['time_axis']['MJDseconds'])
 #sys.exit()
 
 
-tsize,goodtimes=t_length(visdata=visdata,ELO=ELO,nbl=nbl)
-print("TSIZE")
-print(goodtimes)
+#tsize,goodtimes=t_length(visdata=visdata,ELO=ELO,nbl=nbl)
+#print("TSIZE")
+#print(goodtimes)
 
 #Splitting and channel averaging (if desired)
 os.system('rm -rf '+dmsavg+' '+dmsavg+'.flagversions')
@@ -190,6 +202,9 @@ g.write("it scan ext mod moderr\n")
 
 #Start with first iteration
 it=0
+
+refant=gf.refantfinder(antlist=antlist,goodant=antinfo['goodant'])
+iref=np.where(antlist==refant)[0][0]
 
 #refant=35 #DV20 index
 

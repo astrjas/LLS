@@ -621,7 +621,8 @@ for t_step in range(len(ELO_range)-1):
                 xx[:,i]=np.where(thisant==True,np.nan,xx[:,i])
         '''
         #Calculating number of antennas and baselines
-        #-1 is to account for bad ants (ant1=-1 is not valid)    
+        #-1 is to account for bad ants (ant1=-1 is not valid) 
+        #need to rework how pt is pulled
         nb1=0
         for ant1 in np.unique(visdata['antenna1']):
             for ant2 in np.unique(visdata['antenna2']):
@@ -633,8 +634,8 @@ for t_step in range(len(ELO_range)-1):
                     #print(iant2)
                     if thisbase.sum()>0:
                         #potential 0 after thisbase and thistime
-                        pt=xx[thisbase][0][i]
-                        oldpt[nb1,tb1]=pt
+                        pt=xx[thisbase][0][tb1]
+                        #oldpt[nb1,tb1]=pt
                         ga1=antinfo['avg_amp'][iant1][t_step]
                         ga2=antinfo['avg_amp'][iant2][t_step]
                         if iant1==iref: 
@@ -649,17 +650,18 @@ for t_step in range(len(ELO_range)-1):
                         nb1+=1
         tb1+=1
 
-oldpt1 = np.where(np.isnan(oldpt)==True,-1.0,oldpt)
-newpt1 = np.where(np.isnan(newpt)==True,0.0,newpt)
+#oldpt1 = np.where(np.isnan(oldpt)==True,-1.0,oldpt)
+#newpt1 = np.where(np.isnan(newpt)==True,0.0,newpt)
 
 for t in range(nb1):
     #plt.scatter(antinfo['timestamp'],np.abs(newpt1[t,:]))
     oldp=np.array(xx[t])
     newp=np.array(newpt[t])
     #plt.scatter(antinfo['timestamp'],np.abs(op))
-    plt.scatter(antinfo['timestamp'],np.abs(oldp))
-    plt.scatter(antinfo['timestamp'],np.abs(newp))
+    plt.plot(tt,np.abs(oldp),".",c='b')
+    plt.plot(tt,np.abs(newp),".",c='r')
     #plt.scatter(range(tb1),oldpt1[t,:]-newpt1[t,:])
+plt.show()
 plt.savefig("./dplots/visplot_"+auth+date+".png",overwrite=True)
 
 #END OF DOCUMENTED UNIVERSE
