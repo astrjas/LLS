@@ -13,6 +13,10 @@ sys.path.insert(0, path_to_gfunc)
 import gfunc as gf
 #os.system('import gfunc.py')
 
+pol=1
+it=0
+itstr=str(it)
+def lls(pol,corr,datams1,target,case,auth,refmeth,date,it):
 #thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
 
 #setting a dummy refant
@@ -22,10 +26,10 @@ import gfunc as gf
 target='sgr_apr07'
 
 #for image names
-case='noshift_noflag'
-auth='Venki'
-refmeth='refanctfunc'
-date='04182022'
+#case='noshift_noflag'
+#auth='Venki'
+#refmeth='refanctfunc'
+#date='04182022'
 
 #datams0='firsttwointflag_QSOB19.ms'
 #os.system('rm -rf QSOB19_chanavg.ms')
@@ -64,6 +68,9 @@ ms.close()
 allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
 antlist=np.unique(allants)
 
+npol=visdata['data'].shape[0]
+polnames=visdata['axis_info']['corr_axis']
+corr=polnames[pol]
 nant=len(antlist)
 nbl=int(nant*(nant-1)/2)
 ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
@@ -77,7 +84,7 @@ print(len(visdata['axis_info']['time_axis']['MJDseconds']))
 allant=np.zeros((nant,ntimes),dtype=bool)
 alltim=np.zeros((ntimes,nant),dtype=bool)
 
-lp=visdata['data'][0]<0.1
+lp=visdata['data'][pol]<0.1
 #lp=np.zeros_like(visdata['data'][0])
 #lp=np.where(visdata['data']<0.1,np.nan,visdata['data'])
 #xx[:,i]=np.where(thisant==True,np.nan,xx[:,i])
@@ -118,14 +125,14 @@ for ant in antlist:
     #print("ant_tf",ant_tf.shape)
     plt.plot(ant_tf)
     #plotting and saving this
-    plt.savefig("./lpgraphs/ant_tf_ant%i.png"%(ant),overwrite=True)
+    plt.savefig("./lpgraphs/ant_tf_ant%i_%s_it%i.png"%(ant,corr,it),overwrite=True)
     plt.clf()
     #a+=1
 
 #antinfo['goodant']=allant
 
 #lp1=np.zeros_like(lp)
-lp1=np.where(lp==True,np.nan,visdata['data'])
+lp1=np.where(lp==True,np.nan,visdata['data'][pol])
 
 '''
 for y in range(741):
@@ -148,10 +155,10 @@ alltim=np.zeros((ntimes,nant),dtype=bool)
 
 #TENTATIVE BEGINNING OF WHAT WILL BE IN MASSIVE LOOP
 #XX correlation
-xx=np.zeros_like(visdata['data'][0])
-lowpt=np.abs(visdata['data'][0]<0.1)
+xx=np.zeros_like(visdata['data'][pol])
+lowpt=np.abs(visdata['data'][pol]<0.1)
 #bd=xx0<=-1.0
-xx=np.where(lowpt==True,np.nan,visdata['data'][0])
+xx=np.where(lowpt==True,np.nan,visdata['data'][pol])
 #autocorr=visdata['antenna1']==visdata['antenna2']
 print("xxshape",xx.shape)
 
@@ -161,7 +168,7 @@ for y in range(nbl):
     #plt.scatter(tt,pp)
     plt.scatter(tt,np.abs(pp1))
 plt.show()
-plt.savefig('datatestplot_'+auth+refmeth+'_'+date+'.png',overwrite=True)
+plt.savefig('datatestplot_'+auth+refmeth+'_'+date+corr+str(it)+'.png',overwrite=True)
 plt.clf()
 
 #tf matrix for where ant is bad (True)
@@ -187,11 +194,11 @@ for ant in range(nant):
     #print("ant_tf",ant_tf.shape)
     plt.plot(ant_tf)
     #plotting and saving this
-    plt.savefig("./tfgraphs/ant_tf_ant%i.png"%(ant),overwrite=True)
+    plt.savefig("./tfgraphs/ant_tf_ant%i_%s_it%i.png"%(ant,corr,it),overwrite=True)
     plt.clf()
     a+=1
 
-antinfo['goodant']=allant
+antinfo['goodant_'+corr+itstr]=allant
 
    
 for i in range(ntimes):
@@ -212,7 +219,7 @@ for i in range(ntimes):
     #plt.savefig("./tfgraphs/time_tf_t%f.png"%(ELO[i]),overwrite=True)
     #plt.clf()
 
-antinfo['goodt']=alltim
+antinfo['goodt_'+corr+itstr]=alltim
 
 allgoodtime=0
 allbad=0
@@ -223,7 +230,7 @@ nb=0
 nvis=[]
 
 #Cycling through all the times
-for time in antinfo['goodt']:
+for time in antinfo['goodt_'+corr+itstr]:
     if np.any(time)==False: allgoodtime+=1
     if np.any(time)==True:
         nbad=np.count_nonzero(time)
@@ -235,8 +242,8 @@ print("All good antennas:",allgoodtime)
 print("Almost all good antennas:",good1)
 print("All ants bad:",allbad)
 
-refant=gf.refantfinder(antlist=antlist,goodant=antinfo['goodant'])
-iref=np.where(antlist==refant)[0][0]
+refant=gf.refantfinder(antlist=antlist,goodant=antinfo['goodant_'+corr+itstr])
+iref=np.where(antlist==refant)[0]
 #refant=0
 
 
@@ -268,10 +275,9 @@ for i in range(len(antinfo['timestamp'])):
 
     #print(time)
     thistime=(visdata['axis_info']['time_axis']['MJDseconds']==antinfo['timestamp'][i])
-    time=i
+    time=str(i)
     '''
     gt=antinfo['goodt'][i]
-
     #Pulling antennas that are bad for this time
     badant=np.where(gt==True)
     if len(badant)!=0:
@@ -327,12 +333,12 @@ for i in range(len(antinfo['timestamp'])):
                         Theta_r[nb,iant2-1]=-1
                     nb+=1
 
-    gf.dict_update(theta_r_dict,time,Theta_r)
-    gf.dict_update(theta_m_dict,time,theta_m)
+    gf.dict_update(theta_r_dict,time+corr+itstr,Theta_r)
+    gf.dict_update(theta_m_dict,time+corr+itstr,theta_m)
 
 
-    gf.dict_update(script_L_dict,time,script_L)
-    gf.dict_update(l_m_dict,time,l_m)
+    gf.dict_update(script_L_dict,time+corr+itstr,script_L)
+    gf.dict_update(l_m_dict,time+corr+itstr,l_m)
 
 
     script_L_nn=gf.nonan(script_L)
@@ -355,7 +361,7 @@ for i in range(len(antinfo['timestamp'])):
     #Residuals
     l_del=l_m_nn-np.matmul(script_L_nn,l_r)
     #print("l_del \n"+str(l_del))
-    gf.dict_update(l_del_dict,time,l_del)
+    gf.dict_update(l_del_dict,time+corr+itstr,l_del)
     #print(l_del.shape)
 
     l_Ir_res=gf.l_Ir(ll_r=script_L_nn,ll_m=l_del)
@@ -364,7 +370,7 @@ for i in range(len(antinfo['timestamp'])):
 
     theta_del=theta_m_nn-np.matmul(Theta_r_nn,theta_Ir)
     #print("theta_del \n"+str(theta_del))
-    gf.dict_update(theta_del_dict,time,theta_del)
+    gf.dict_update(theta_del_dict,time+corr+itstr,theta_del)
 
     theta_Ir_res=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_del)
     #print("theta_Ir w/ resids: \n"+str(theta_Ir_res))
@@ -372,7 +378,7 @@ for i in range(len(antinfo['timestamp'])):
 
     l_Ir_final=l_r+l_Ir_res
     #print(l_Ir_final.shape)
-    gf.dict_update(l_r_dict,time,l_Ir_final)
+    gf.dict_update(l_r_dict,time+corr+itstr,l_Ir_final)
     #print("final amps (log form) \n"+str(l_Ir_final))
 
     Ir_converted=np.zeros_like(l_Ir_final)
@@ -397,10 +403,10 @@ for i in range(len(antinfo['timestamp'])):
         break
         #continue
 
-    gf.dict_update(l_Ir_conv_dict,time,Ir_converted)
+    gf.dict_update(l_Ir_conv_dict,time+corr+itstr,Ir_converted)
 
     theta_Ir_final=theta_Ir+theta_Ir_res
-    gf.dict_update(theta_Ir_dict,time,theta_Ir_final)
+    gf.dict_update(theta_Ir_dict,time+corr+itstr,theta_Ir_final)
 
 
     #print("final amps (converted) \n"+str(Ir_converted))
@@ -437,27 +443,27 @@ amp_arr=np.zeros((nant,1,ntimes),dtype=float)
 
 for t_step in range(ntimes):
     for k in range(nant):
-        amp_arr[k,0,t_step]=l_Ir_conv_dict[t_step][k]
+        amp_arr[k,0,t_step]=l_Ir_conv_dict[str(t_step)+corr+itstr][k]
         if k==refant: 
             phase_arr[k,0,t_step]=0
         elif k<refant:
-            phase_arr[k,0,t_step]=theta_Ir_dict[t_step][k]
+            phase_arr[k,0,t_step]=theta_Ir_dict[str(t_step)+corr+itstr][k]
         elif k>refant:
-            phase_arr[k,0,t_step]=theta_Ir_dict[t_step][k-1]
+            phase_arr[k,0,t_step]=theta_Ir_dict[str(t_step)+corr+itstr][k-1]
 
-antinfo['phase']=np.squeeze(phase_arr)
-antinfo['amp']=np.squeeze(amp_arr)
+antinfo['phase_'+corr+itstr]=np.squeeze(phase_arr)
+antinfo['amp_'+corr+itstr]=np.squeeze(amp_arr)
 
 for t_step in range(len(ELO_range)-1):
     nd=len([antinfo['timestamp'][x] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])])
     for k in range(nant):
-        avga[k,0,t_step]=np.mean([l_Ir_conv_dict[t_step][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+        avga[k,0,t_step]=np.mean([l_Ir_conv_dict[str(t_step)+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
         if k==refant and nd!=0: 
             avgp[k,0,t_step]=0
         elif k<refant and nd!=0:
-            avgp[k,0,t_step]=np.mean([theta_Ir_dict[t_step][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+            avgp[k,0,t_step]=np.mean([theta_Ir_dict[str(t_step)+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
         elif k>refant and nd!=0:
-            avgp[k,0,t_step]=np.mean([theta_Ir_dict[t_step][k-1] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+            avgp[k,0,t_step]=np.mean([theta_Ir_dict[str(t_step)+corr+itstr][k-1] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
 
  
     if np.isnan(np.mean(avga[:,0,t_step]))==True or np.isnan(np.mean(avgp[:,0,t_step]))==True:
@@ -470,8 +476,8 @@ for t_step in range(len(ELO_range)-1):
             nbad+=1
     else: nonan+=1
 
-antinfo['avg_phase']=np.squeeze(avgp)
-antinfo['avg_amp']=np.squeeze(avga)    
+antinfo['avg_phase_'+corr+itstr]=np.squeeze(avgp)
+antinfo['avg_amp_'+corr+itstr]=np.squeeze(avga)    
 
 #where comments ended
 #ELO_range[:-1]
@@ -482,7 +488,7 @@ for a in range(nant):
 plt.legend()
 plt.show()
 
-plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+'.png')
+plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+corr+itstr+'.png')
 
 plt.clf()
 
@@ -492,7 +498,7 @@ for a in range(nant):
 plt.legend()
 plt.show()
 
-plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+'.png')
+plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+corr+itstr+'.png')
 
 
 plt.clf()
@@ -503,25 +509,25 @@ for a in range(nant):
 plt.legend()
 plt.show()
 
-plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+'.png')
+plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+corr+itstr+'.png')
 
 plt.clf()
 
 for a in range(nant):
-    plt.scatter(antinfo['timestamp'],antinfo['amp'][a],color='black',marker='x')
+    plt.scatter(antinfo['timestamp'],antinfo['amp_'+corr+itstr][a],color='black',marker='x')
 plt.legend()
 plt.show()
 
-plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+'.png')
+plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+corr+itstr+'.png')
 
 plt.clf()
 
 for a in range(nant):
-    plt.scatter(antinfo['timestamp'],antinfo['phase'][a],color='red')
+    plt.scatter(antinfo['timestamp'],antinfo['phase_'+corr+itstr][a],color='red')
 plt.legend()
 plt.show()
 
-plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+'.png')
+plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+corr+itstr+'.png')
 
 plt.clf()
 
@@ -534,10 +540,8 @@ print("Total points:",len(antinfo['timestamp']))
 
 '''
 newpt=np.zeros_like(l_m)
-
 nb1=0
 tb1=0
-
 for time in ELO:
     thistime=(visdata['axis_info']['time_axis']['MJDseconds']==time)
     itime=np.where(ELO==time)[0]
@@ -550,16 +554,12 @@ for time in ELO:
     #print("RSIZE")
     #print(rsize)
     if rsize<nbl:continue
-
     #script_L=np.zeros((rsize,nant),dtype=int)
     #l_m=np.zeros((rsize,1),dtype=float)
-
     #script_L=np.zeros((nbl,nant),dtype=int)
     #l_m=np.zeros((nbl,1),dtype=float)
-
     igtime=np.where(goodtimes==itime)
     nb1=0
-
     for ant1 in np.unique(visdata['antenna1']):
         for ant2 in np.unique(visdata['antenna2']):
             if ant1 < ant2:
@@ -574,16 +574,11 @@ for time in ELO:
                     pt=visdata['data'][0][thisbase][0][thistime][0]
                     #print(type(pt))
                     newpt[nb1,0,tb1]=pt.real/(Ir_converted[iant1,0,igtime]*Ir_converted[iant2,0,igtime]*np.exp(1j*(phase1-phase2)))
-
                     nb1+=1
     tb1+=1
-
-
 print(newpt)
-
 for t in range(tsize):
     plt.scatter(range(nb1),newpt[:,0,t])
-
 '''
 
 
@@ -608,7 +603,7 @@ for t_step in range(len(ELO_range)-1):
         thistime=(visdata['axis_info']['time_axis']['MJDseconds']==tchunk[i])
         time=i
 
-        gt=antinfo['goodt'][i]
+        gt=antinfo['goodt_'+corr+itstr][i]
     
         #Pulling antennas that are bad for this time
         '''
@@ -636,16 +631,16 @@ for t_step in range(len(ELO_range)-1):
                         #potential 0 after thisbase and thistime
                         pt=xx[thisbase][0][tb1]
                         #oldpt[nb1,tb1]=pt
-                        ga1=antinfo['avg_amp'][iant1][t_step]
-                        ga2=antinfo['avg_amp'][iant2][t_step]
+                        ga1=antinfo['avg_amp_'+corr+itstr][iant1][t_step]
+                        ga2=antinfo['avg_amp_'+corr+itstr][iant2][t_step]
                         if iant1==iref: 
                             gp1=0.
                         else:
-                            gp1=antinfo['avg_phase'][iant1][t_step]
+                            gp1=antinfo['avg_phase_'+corr+itstr][iant1][t_step]
                         if iant2==iref:
                             gp2=0.
                         else:
-                            gp2=antinfo['avg_phase'][iant2][t_step]
+                            gp2=antinfo['avg_phase_'+corr+itstr][iant2][t_step]
                         newpt[nb1,tb1]=pt/(ga1*ga2*np.exp(1.0j*(gp1-gp2)))
                         nb1+=1
         tb1+=1
@@ -662,7 +657,8 @@ for t in range(nb1):
     plt.plot(tt,np.abs(newp),".",c='r')
     #plt.scatter(range(tb1),oldpt1[t,:]-newpt1[t,:])
 plt.show()
-plt.savefig("./dplots/visplot_"+auth+date+".png",overwrite=True)
+plt.savefig("./dplots/visplot_"+auth+date+corr+itstr+".png",overwrite=True)
 
+
+return newpt,antinfo
 #END OF DOCUMENTED UNIVERSE
-
