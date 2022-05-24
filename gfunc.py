@@ -12,6 +12,7 @@ path_to_gfunc='.'
 sys.path.insert(0, path_to_gfunc)
 import gfunc as gf
 import casatools
+from casatools import ms
 
 def nonan(arr):
     return np.where(np.isfinite(arr),arr,0)
@@ -182,7 +183,7 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it):
 
     visdata['data'] = np.squeeze(visdata['data'])
     print("data shape",visdata['data'].shape)
-    ms.close()
+    MS.close()
 
     allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
     antlist=np.unique(allants)
