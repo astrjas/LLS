@@ -1,4 +1,5 @@
-from NordicARC import uvmultifit as uvm
+
+#from NordicARC import uvmultifit as uvm
 import numpy as np
 import time
 import matplotlib.pyplot as plt
@@ -10,12 +11,11 @@ path_to_gfunc='.'
 sys.path.insert(0, path_to_gfunc)
 import gfunc as gf
 
-
 #Setting default value for TCLEAN stopcode
 stop=0
 
 #To time the code
-start=time.time()
+#start=time.time()
 
 #this is for Venki data
 target='sgr_apr07'
@@ -31,6 +31,27 @@ datams1=target+'_flagcor_noflags.ms'
 
 #Getting file name
 dmsprefix=datams1[:-3]
+
+
+#Initial data file name and name for channel-averaged file
+datams1=target+'_flagcor_noflags.ms'
+
+#Getting file name
+dmsprefix=datams1[:-3]
+
+
+ms.open(datams1,nomodify=True)
+visdata = ms.getdata(['antenna1','antenna2','data','data_desc_id','sigma','axis_info'],ifraxis=True)
+visdata['data'] = np.squeeze(visdata['data'])
+ms.close()
+
+#Number of polarizations
+npol=visdata['data'].shape[0]
+polnames=visdata['axis_info']['corr_axis']
+#corr=polnames[pol]
+
+
+'''
 
 #Setting name of file for time-averaged split file
 dmsavg=dmsprefix+'_avg.ms'
@@ -66,10 +87,6 @@ antlist=np.unique(allants)
 
 print(antlist)
 
-#Number of polarizations
-npol=visdata['data'].shape[0]
-polnames=visdata['axis_info']['corr_axis']
-#corr=polnames[pol]
 
 #Calculating number of antennas and baselines
 nant=int(len(antlist))
@@ -158,7 +175,7 @@ ms.close()
 #Creating and initializing data file to store UVMULTIFIT pt source flux
 g=open("uvmflux_"+target+".txt","w")
 g.write("it scan ext mod moderr\n")
-
+'''
 '''
 #######from looptest########
 for ant in antlist:
@@ -185,7 +202,7 @@ for ant in antlist:
 antinfo['goodant']=allant
 ############################
 '''
-
+'''
 #Start with first iteration
 it=0
 
@@ -197,7 +214,10 @@ it=0
 
 #The wily (formerly) infinite while loop
 #while(1):
+'''
+it=0
 while it<=0:
+    '''
     #Declaring empty arrays for mod UVM flux and error
     muvmf=np.array([])
     muvmferr=np.array([])
@@ -304,30 +324,33 @@ while it<=0:
     for i in range(len(scan)):
         g.write(str(it)+" "+str(scan[i])+" "+str(ruvmf[i])+" "+str(muvmf1[i])+" "+str(muvmferr1[i])+"\n")
 
-
+    '''
     #File where final set of residuals is the data
     datams_ext3=dmsprefix+'_ext3_it'+'{0:02d}'.format(it)+'.ms'
     
     #Splitting and creating the files where second 
     #round of residuals is the data column
+
     '''
     os.system('rm -rf '+datams_ext3+' '+datams_ext3+'.flagversions')
     split(vis=datams_ext2,outputvis=datams_ext3,datacolumn='corrected')
     '''
-    tb.open(datams_ext2)
-    ext2=tb.getcol('CORRECTED_DATA')
-    tb.close()
+    
+    #tb.open(datams_ext2)
+    #ext2=tb.getcol('CORRECTED_DATA')
+    #tb.close()
 
     #Splitting and creating the files
     #The datacolumn here means nothing, it will be replaced
-    os.system('rm -rf '+datams_ext3+' '+datams_ext3+'.flagversions')
-    split(vis=datams_ext2,outputvis=datams_ext3,datacolumn='data')
+    #os.system('rm -rf '+datams_ext3+' '+datams_ext3+'.flagversions')
+    #split(vis=datams_ext2,outputvis=datams_ext3,datacolumn='data')
 
     #Making the residuals of the first UVMULTIFIT the data column of the new file
-    tb.open(datams_ext3,nomodify=False)
-    tb.putcol('DATA', ext2)
-    tb.close()
-
+    #tb.open(datams_ext3,nomodify=False)
+    #tb.putcol('DATA', ext2)
+    #tb.close()
+    
+    '''
     imname_dc=dmsprefix+'_it'+'{0:02d}'.format(it)+'_dirtyext'
     os.system('rm -rf '+imname_dc+'.*')
     tclean(vis=datams_ext3,
@@ -359,7 +382,7 @@ while it<=0:
 
 
 
-        
+    '''    
     '''
     #Self-calibrating final cleaned residuals
     os.system("rm -rf phaseamp"+str(it)+".cal")
