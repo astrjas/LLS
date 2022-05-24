@@ -170,6 +170,7 @@ split(vis=datams2,outputvis=flagfile,keepflags=False,datacolumn='data')
 def lls(pol,corr,datams1,target,case,auth,refmeth,date,it):
     #datams1=flagfile
     MS=casatools.ms()
+    itstr=str(it)
 
 
     #Opening data and pulling necessary info
