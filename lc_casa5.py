@@ -946,8 +946,8 @@ rawsplit=dmsprefix+'_rawsplit.ms'
 os.system('rm -rf '+rawsplit+' '+rawsplit+'.flagversions')
 split(vis=dmsavg,
       outputvis=rawsplit,
-      timebin='240s',
-      combine='scan',
+      timebin='60s',
+      combine='scan,state',
       datacolumn='data',keepflags=False)
 
 
