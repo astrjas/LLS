@@ -359,8 +359,8 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     #lme=open("lm_"+target+date+corr+itstr+".txt","w")
     #ast=open("astore_"+target+date+corr+itstr+".txt","w")
 
-    tir_ext,lir_ext,l_ext,ln_ext,sl_ext,sln_ext=gsolve(nbl=nbl,nant=nant,vdata=visdata,varr=xx,ainfo=antinfo,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
-    tir_cln,lir_cln,l_cln,ln_cln,sl_cln,sln_cln=gsolve(nbl=nbl,nant=nant,vdata=visdata,varr=xx_clean,ainfo=antinfo_clean,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
+    tir_ext,lir_ext=gsolve(nbl=nbl,nant=nant,vdata=visdata,varr=xx,ainfo=antinfo,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
+    tir_cln,lir_cln=gsolve(nbl=nbl,nant=nant,vdata=visdata,varr=xx_clean,ainfo=antinfo_clean,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
 
 
 
@@ -719,13 +719,13 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
 
     plt.clf()
 
     for a in range(nant):
         plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
-        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gampavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gampavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
         #plt.ylim(bottom=0.0,top=3.5)
         plt.clf()
     plt.clf()
@@ -736,14 +736,14 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
 
 
     plt.clf()
 
     for a in range(nant):
         plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
-        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gphavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gphavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
     plt.clf()
 
 
@@ -752,14 +752,14 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
 
     plt.clf()
 
     for a in range(nant):
         plt.scatter(antinfo['timestamp'],antinfo['amp_'+corr+itstr][a],color='black',marker='x')
         plt.show()
-        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gamp'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gamp'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
         #plt.show()
         #plt.ylim(bottom=0.0,top=3.5)
         plt.clf()
@@ -770,14 +770,14 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+corr+itstr+'1.png')
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
 
     plt.clf()
 
     for a in range(nant):
         plt.scatter(antinfo['timestamp'],antinfo['phase_'+corr+itstr][a],color='red')
         plt.show()
-        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gph'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gph'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
         #plt.show()
         plt.clf()
     plt.clf()
@@ -787,7 +787,7 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
 
     plt.clf()
 
@@ -888,7 +888,7 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.clf()
 
 
-    #gf.dict_update(antinfo,'newres_'+corr+itstr,newpt)
+    #gf.dict_update(antinfo,'newres_'+corr+itstr,newres)
     gf.dict_update(antinfo1,'newvis_'+corr+itstr,newpt)
 
     #ast.close()
@@ -910,7 +910,7 @@ target='sgr_apr07'
 case='allant'
 auth='Venki'
 refmeth='ref8'
-date='11222022_'+str(attn)
+date='12082022_'+str(attn)
 
 datams2=target+'_flagcor.ms'
 
@@ -921,13 +921,35 @@ flagfile=datams2[:-3]+'_noflags.ms'
 #Initial data file name and name for channel-averaged file
 #datams1=target+'_flagcor_noflags.ms'
 #datams1=flagfile
-datams1='sgr_apr07_flag.ms'
+datams3='sgr_apr07_flag.ms'
 
 #Getting file name
-dmsprefix=datams1[:-3]
+dmsprefix0=datams3[:-3]
 
 #Setting name of file for time-averaged split file
-dmsavg=dmsprefix+'_avg.ms'
+dmsavg=dmsprefix0+'_avg.ms'
+
+#Getting file name
+dmsprefix=dmsavg[:-3]
+datams1=dmsavg
+
+#Splitting and channel averaging (if desired)
+os.system('rm -rf '+dmsavg+' '+dmsavg+'.flagversions')
+split(vis=datams3,
+      outputvis=dmsavg,
+      datacolumn='data',keepflags=False)
+
+rawdata=dmsavg
+clearcal(vis=rawdata,spw='0,1,2,3',addmodel=True)
+
+rawsplit=dmsprefix+'_rawsplit.ms'
+os.system('rm -rf '+rawsplit+' '+rawsplit+'.flagversions')
+split(vis=dmsavg,
+      outputvis=rawsplit,
+      timebin='240s',
+      combine='scan',
+      datacolumn='data',keepflags=False)
+
 
 
 #Remove all previous attempts
@@ -949,7 +971,7 @@ os.system('rm -rf '+dmsprefix+'_selfcal*_mod_it*.ms')
 os.system('rm -rf '+dmsprefix+'_selfcal*_ext2_it*.ms')
 
 
-clearcal(vis=datams1,spw='0,1,2,3',addmodel=True)
+clearcal(vis=datams3,spw='0,1,2,3',addmodel=True)
 
 
 ms.open(datams1,nomodify=True)
@@ -1059,6 +1081,7 @@ print(len(np.unique(visdata['axis_info']['time_axis']['MJDseconds'])))
 #print("TSIZE")
 #print(goodtimes)
 
+'''
 #Splitting and channel averaging (if desired)
 os.system('rm -rf '+dmsavg+' '+dmsavg+'.flagversions')
 split(vis=datams1,
@@ -1073,7 +1096,7 @@ os.system('rm -rf '+rawsplit+' '+rawsplit+'.flagversions')
 split(vis=dmsavg,
       outputvis=rawsplit,
       datacolumn='data',keepflags=False)
-
+'''
 
 #Setting initial data file for analysis
 datams0=rawsplit
