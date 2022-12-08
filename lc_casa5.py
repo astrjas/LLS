@@ -21,104 +21,6 @@ sys.path.insert(0,"/home/jasminwash/.local/lib/python2.7/site-packages/NordicARC
 
 from NordicARC import uvmultifit as uvm
 
-def antfunc_ext(dfile,it,pol,date):
-    itstr=str(it)
-    ms.open(dfile,nomodify=True)
-    visdata = ms.getdata(['antenna1','antenna2','flag','model_data','data_desc_id','sigma','axis_info'],ifraxis=True)
-    visdata['model_data'] = np.squeeze(visdata['model_data'])
-    ms.close()
-
-    allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
-    antlist=np.unique(allants)
-
-    npol=visdata['model_data'].shape[0]
-    polnames=visdata['axis_info']['corr_axis']
-    corr=polnames[pol]
-    nant=len(antlist)
-    nbl=int(nant*(nant-1)/2)
-    ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
-
-    #lp=visdata['data'][pol]<0.01
-
-    tt=np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)
-
-
-
-    #cycle through each ant
-    #a=0
-
-    #lp1=np.zeros_like(lp)
-    #lp1=np.where(lp==True,np.nan,visdata['data'][pol])
-
-
-    #Creating a tf dictionary for each ant and whether time is good or bad there
-    antinfo=dict()
-    antinfo['timestamp']=visdata['axis_info']['time_axis']['MJDseconds']
-
-    allant=np.zeros((nant,ntimes),dtype=bool)
-    alltim=np.zeros((ntimes,nant),dtype=bool)
-
-
-
-    #TENTATIVE BEGINNING OF WHAT WILL BE IN MASSIVE LOOP
-    #XX correlation
-    xx=np.zeros_like(visdata['flag'][pol])
-    flagpt=(visdata['flag'][pol]==True)
-    xx=np.squeeze(np.where(flagpt==True,np.nan,visdata['model_data'][pol]))
-    print("xxshape",xx.shape)
-
-    for y in range(nbl):
-        pp1=np.array(xx[y])
-        #plt.scatter(tt,pp)
-        plt.scatter(tt,np.abs(pp1))
-    plt.show()
-    #plt.savefig('datatestplot_'+auth+refmeth+'_'+date+corr+str(it)+'.png',overwrite=True)
-    plt.savefig('datatestplot_cmodel_'+str(it)+date+'.png',overwrite=True)
-    plt.clf()
-
-    #tf matrix for where ant is bad (True)
-    tfdata=np.isnan(xx)
-    print(tfdata)
-
-    #cycle through each ant
-    a=0
-    for ant in range(nant):
-        #print("ANT",ant)
-        #all baselines w/ this ant
-        thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
-        #pull all baselines for this ant at all times w/in tfdata
-        allt1ant=tfdata[thisant][:]
-        #printing number of baselines w/ this ant and all times to make sure right shape
-        #print("allt1ant",allt1ant.shape)
-        #evaluating if baseline/antenna is bad at each time
-        ant_tf=np.all(allt1ant,axis=0)
-        #Adding to goodant
-        allant[ant,:]=ant_tf
-        #print("ant_tf",ant_tf.shape)
-        plt.plot(ant_tf)
-        #plotting and saving this
-        plt.savefig("./tfgraphs/ant_tf_ant%i_%s_it%i.png"%(ant,corr,it),overwrite=True)
-        plt.clf()
-        a+=1
-
-    antinfo['goodant_'+corr+itstr]=allant
-
-
-    for i in range(ntimes):
-        j=0
-        tfstore=np.zeros(len(antlist),dtype=bool)
-        ct=visdata['axis_info']['time_axis']['MJDseconds'][i]
-        #print("tstamp",ct)
-        for ant in range(nant):
-            tfstore[j]=allant[ant][i]
-            j+=1
-        alltim[i,:]=tfstore
-
-
-    antinfo['goodt_'+corr+itstr]=alltim
-    return antinfo,xx
-
-
 def antfunc(dfile,it,pol,date):
     itstr=str(it)
     ms.open(dfile,nomodify=True)
@@ -136,18 +38,7 @@ def antfunc(dfile,it,pol,date):
     nbl=int(nant*(nant-1)/2)
     ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
 
-    #lp=visdata['data'][pol]<0.01
-
     tt=np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)
-
-
-
-    #cycle through each ant
-    #a=0
-
-    #lp1=np.zeros_like(lp)
-    #lp1=np.where(lp==True,np.nan,visdata['data'][pol])
-
 
     #Creating a tf dictionary for each ant and whether time is good or bad there
     antinfo=dict()
@@ -156,10 +47,6 @@ def antfunc(dfile,it,pol,date):
     allant=np.zeros((nant,ntimes),dtype=bool)
     alltim=np.zeros((ntimes,nant),dtype=bool)
 
-
-
-    #TENTATIVE BEGINNING OF WHAT WILL BE IN MASSIVE LOOP
-    #XX correlation
     xx=np.zeros_like(visdata['flag'][pol])
     flagpt=(visdata['flag'][pol]==True)
     xx=np.squeeze(np.where(flagpt==True,np.nan,visdata['data'][pol]))
@@ -171,33 +58,32 @@ def antfunc(dfile,it,pol,date):
         plt.scatter(tt,np.abs(pp1))
     plt.show()
     #plt.savefig('datatestplot_'+auth+refmeth+'_'+date+corr+str(it)+'.png',overwrite=True)
-    plt.savefig('datatestplot_fullvis_'+str(it)+date+'.png',overwrite=True)
+    plt.savefig('datatestplot_'+str(dfile[:-3])+'_'+str(it)+date+'1.png',overwrite=True)
     plt.clf()
 
-    #tf matrix for where ant is bad (True)
-    tfdata=np.isnan(xx)
+    #tf matrix for where amp of ant is bad (True)
+    tfdata=np.isnan(np.log10(np.abs(xx)))
+    #np.log10(np.abs(xx))
     print(tfdata)
 
     #cycle through each ant
-    a=0
-    for ant in range(nant):
-        #print("ANT",ant)
+    #a=0
+    for a in range(nant):
+        ant=antlist[a]
         #all baselines w/ this ant
         thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
         #pull all baselines for this ant at all times w/in tfdata
         allt1ant=tfdata[thisant][:]
-        #printing number of baselines w/ this ant and all times to make sure right shape
-        #print("allt1ant",allt1ant.shape)
         #evaluating if baseline/antenna is bad at each time
         ant_tf=np.all(allt1ant,axis=0)
         #Adding to goodant
-        allant[ant,:]=ant_tf
+        allant[a,:]=ant_tf
         #print("ant_tf",ant_tf.shape)
         plt.plot(ant_tf)
         #plotting and saving this
-        plt.savefig("./tfgraphs/ant_tf_ant%i_%s_it%i.png"%(ant,corr,it),overwrite=True)
+        plt.savefig("./tfgraphs/ant_tf_ant%i_%s_it%i1.png"%(ant,corr,it),overwrite=True)
         plt.clf()
-        a+=1
+        #a+=1
 
     antinfo['goodant_'+corr+itstr]=allant
 
@@ -215,13 +101,197 @@ def antfunc(dfile,it,pol,date):
 
     antinfo['goodt_'+corr+itstr]=alltim
     return antinfo,xx
+####################################################################
+def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
+    theta_r_dict={}
+    theta_m_dict={}
+    theta_Ir_dict={}
+    theta_del_dict={}
+    theta_rms_dict={}
+
+    script_L_dict={}
+    theta_r_nn_dict={}
+    l_m_dict={}
+    theta_m_nn_dict={}
+    l_r_dict={}
+    l_del_dict={}
+    l_rms_dict={}
+    l_Ir_conv_dict={}
+    all_bdance={}
+    #all_bdance_ph={}
+
+    smc=0
+
+    rfantind=np.where(antlist==refant)[0][0]
+
+    for j in range(len(ainfo['timestamp'])):
+        #Jacobian and measured phase matrix
+        Theta_r=np.zeros((nbl,nant-1),dtype=int)
+        theta_m=np.zeros((nbl,1),dtype=float)
+
+        #Defining Jacobian and measured amp matrix
+        script_L=np.zeros((nbl,nant),dtype=int)
+        l_m=np.zeros((nbl,1),dtype=float)
+        astore=np.zeros((nbl,1),dtype=float)
+        bantstore=[]
+
+
+        #print(time)
+        thistime=(vdata['axis_info']['time_axis']['MJDseconds']==ainfo['timestamp'][j])
+        time=str(j)
+
+        #Calculating number of antennas and baselines
+        #-1 is to account for bad ants (ant1=-1 is not valid)    
+        nb=0
+        for ant1 in np.unique(vdata['antenna1']):
+            for ant2 in np.unique(vdata['antenna2']):
+                if ant1 < ant2:
+                    thisbase = (vdata['antenna1']==ant1) & (vdata['antenna2']==ant2)
+                    iant1=np.where(antlist==ant1)[0][0]
+                    #print(iant1)
+                    iant2=np.where(antlist==ant2)[0][0]
+                    #print(iant2)
+                    if thisbase.sum()>0:
+                        #potential 0 after thisbase and thistime
+                        pt=varr[thisbase][0][j]
+                        #print("PT",pt)
+                        ph=np.angle(pt,deg=True)
+                        amp=np.absolute(pt)
+                        if np.isnan(amp)==True: 
+                            bantstore.append(iant1)
+                            #bantstore.append(iant2)
+                        #print("AMP",amp)
+
+                        #if iant1==5 or iant2==5:
+                            #amp*=4
+                            #ph+=90
+                            #print("bing")
+
+                        l_m[nb,0]=np.log10(amp)
+                        astore[nb,0]=amp
+
+                        script_L[nb,iant1]=1
+                        script_L[nb,iant2]=1
+
+
+                        #PHASE STUFF
+                        theta_m[nb,0]=ph
+
+                        if ant1==refant: Theta_r[nb,iant2-1]=-1
+                        if ant2==refant: Theta_r[nb,iant1]=1
+                        if ant1!=refant and ant1>refant:
+                            Theta_r[nb,iant1-1]=1
+                            Theta_r[nb,iant2-1]=-1
+                        if ant1!=refant and ant2<refant:
+                            Theta_r[nb,iant1]=1
+                            Theta_r[nb,iant2]=-1
+                        if (ant1!=refant and (ant2>refant and ant1<refant)):
+                            Theta_r[nb,iant1]=1
+                            Theta_r[nb,iant2-1]=-1
+                        nb+=1
+        badance=np.full((nant,1),False,dtype=bool)
+        for ia in range(nant):
+            #print(bantstore.count(ia))
+            #if ia==38: 
+            #    if bantstore.count(ia)>0: badance[ia,0]=True
+            #else:
+            if bantstore.count(ia)==38-ia: badance[ia,0]=True
+        #badance=np.unique(bantstore)
+        #print(badance)
+        plt.scatter(j,len(np.where(badance==True)[0]))
+        gf.dict_update(all_bdance,time+corr+itstr,badance)
+
+        gf.dict_update(theta_r_dict,time+corr+itstr,Theta_r)
+        gf.dict_update(theta_m_dict,time+corr+itstr,theta_m)
+
+
+        gf.dict_update(script_L_dict,time+corr+itstr,script_L)
+        gf.dict_update(l_m_dict,time+corr+itstr,l_m)
+        
+
+        #scl.write("\n\n")
+
+        #lme.write("\n\n")
+
+        #ast.write(str(astore))
+        #ast.write("\n\n")
+
+
+        script_L_nn=gf.nonan(script_L)
+        #gf.dict_update(script_L_nn_dict,time+corr+itstr,script_L_nn)
+        #scl.write(str(script_L_nn))
+        l_m_nn=gf.nonan(l_m)
+        #gf.dict_update(l_m_nn_dict,time+corr+itstr,l_m_nn)
+        #lme.write(str(l_m_nn))
+
+        #l_r=gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn)
+        print(len(np.where(l_m_nn.mask==False)[0]))
+        print(j)
+        l_r=gf.l_Ir_mask(ll_r=script_L_nn,ll_m=l_m_nn,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,bdance=badance)
+
+
+        Theta_r_nn=gf.nonan(Theta_r)
+        gf.dict_update(theta_r_nn_dict,time+corr+itstr,Theta_r_nn)
+        theta_m_nn=gf.nonan(theta_m)
+        gf.dict_update(theta_m_nn_dict,time+corr+itstr,theta_m_nn)
+
+        theta_Ir=gf.th_Ir_mask(Th_r=Theta_r_nn,th_m=theta_m_nn,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,rfantind=rfantind,bdance=badance)
+        #theta_Ir=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_m_nn)
+
+
+
+        #Residuals
+        l_del=l_m_nn-np.matmul(script_L_nn,l_r)
+        #print("l_del \n"+str(l_del))
+        gf.dict_update(l_del_dict,time+corr+itstr,l_del)
+        #print(l_del.shape)
+
+        l_Ir_res=gf.l_Ir_mask(ll_r=script_L_nn,ll_m=l_del,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,bdance=badance)
+
+        #print("l_Ir w/ resids: \n"+str(l_Ir_res))
+
+        theta_del=theta_m_nn-np.matmul(Theta_r_nn,theta_Ir)
+        #print("theta_del \n"+str(theta_del))
+        gf.dict_update(theta_del_dict,time+corr+itstr,theta_del)
+
+        theta_Ir_res=gf.th_Ir_mask(Th_r=Theta_r_nn,th_m=theta_del,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,rfantind=rfantind,bdance=badance)
+        #theta_Ir_res=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_del)
+        #theta_Ir_res,restd,rnktd,stdel=lstsq(a=Theta_r_nn,b=theta_del)
+        #print("theta_Ir w/ resids: \n"+str(theta_Ir_res))
+
+
+        l_Ir_final=l_r+l_Ir_res
+        #ast.write(str(l_Ir_final))
+        #l_Ir_final=l_r
+        #print("l_ir_shape")
+        #print(l_Ir_final.shape)
+        gf.dict_update(l_r_dict,time+corr+itstr,l_Ir_final)
+        #print("final amps (log form) \n"+str(l_Ir_final))
+
+        Ir_converted=np.zeros_like(l_Ir_final)
+
+        #Ir_converted=np.vstack([10.0**x for x in l_Ir_final])
+        for x in range(l_Ir_final.shape[0]):
+            lir=l_Ir_final[x,0]
+            Ir_converted[x,0]=10.0**lir
+            
+        #print("l_conv shape")
+        #print(Ir_converted.shape)
+
+        gf.dict_update(l_Ir_conv_dict,time+corr+itstr,Ir_converted)
+
+        theta_Ir_final=theta_Ir+theta_Ir_res
+        gf.dict_update(theta_Ir_dict,time+corr+itstr,theta_Ir_final)
+    #plt.show()
+    plt.savefig('validants.png',overwrite=True)
+    plt.show()
+    plt.clf()
+    return theta_Ir_dict, l_Ir_conv_dict
 
 
 ####################################################################
 
 def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
-    #datams1=flagfile
-    #MS=casatools.ms()
     itstr=str(it)
 
     print(datams1)
@@ -229,20 +299,20 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     #Opening data and pulling necessary info
     ms.open(datams1,nomodify=True)
     ms.selectinit(reset=True)
-    visdata = ms.getdata(['antenna1','antenna2','model_data','axis_info','flag'],ifraxis=True)
+    visdata = ms.getdata(['antenna1','antenna2','data','axis_info','flag'],ifraxis=True)
     #printing correlations
     print(visdata['axis_info']['corr_axis'])
 
     #Squeeze data then close ms
 
-    visdata['model_data'] = np.squeeze(visdata['model_data'])
-    print("data shape",visdata['model_data'].shape)
+    visdata['data'] = np.squeeze(visdata['data'])
+    print("data shape",visdata['data'].shape)
     ms.close()
 
     allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
     antlist=np.unique(allants)
 
-    npol=visdata['model_data'].shape[0]
+    npol=visdata['data'].shape[0]
     polnames=visdata['axis_info']['corr_axis']
     corr=polnames[pol]
     nant=len(antlist)
@@ -254,8 +324,9 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     print(len(ELO))
     print(len(visdata['axis_info']['time_axis']['MJDseconds']))
     #print([x-ELO[0] for x in ELO])
-    
-    antinfo,xx=antfunc_ext(dfile=datams1,it=it,pol=pol,date=date)
+
+    antinfo,xx=antfunc(dfile=datams1,it=it,pol=pol,date=date)
+    antinfo_clean,xx_clean=antfunc(dfile=datams_cm,it=it,pol=pol,date=date)
     print("XX",xx.shape)
 
 
@@ -283,12 +354,18 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     #iref=np.where(antlist==refant)[0]
     refant=rfant
     iref=np.where(antlist==refant)[0]
-   
-    scl=open("scriptL_"+target+date+corr+itstr+".txt","w")
-    lme=open("lm_"+target+date+corr+itstr+".txt","w")
-    ast=open("astore_"+target+date+corr+itstr+".txt","w")
+
+    #scl=open("scriptL_"+target+date+corr+itstr+".txt","w")
+    #lme=open("lm_"+target+date+corr+itstr+".txt","w")
+    #ast=open("astore_"+target+date+corr+itstr+".txt","w")
+
+    tir_ext,lir_ext,l_ext,ln_ext,sl_ext,sln_ext=gsolve(nbl=nbl,nant=nant,vdata=visdata,varr=xx,ainfo=antinfo,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
+    tir_cln,lir_cln,l_cln,ln_cln,sl_cln,sln_cln=gsolve(nbl=nbl,nant=nant,vdata=visdata,varr=xx_clean,ainfo=antinfo_clean,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
 
 
+
+    '''
+    #def gsolve(nbl,nant,vdict,varr,
     theta_r_dict={}
     theta_m_dict={}
     theta_Ir_dict={}
@@ -375,15 +452,10 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
 
         gf.dict_update(script_L_dict,time+corr+itstr,script_L)
         gf.dict_update(l_m_dict,time+corr+itstr,l_m)
-        
-        #print("script_L")
-        #print(script_L)
-        #scl.write(str(script_L))
+
+
         scl.write("\n\n")
 
-        #print("l_m")
-        #print(l_m)
-        #lme.write(str(l_m))
         lme.write("\n\n")
 
         #ast.write(str(astore))
@@ -394,19 +466,14 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
         scl.write(str(script_L_nn))
         l_m_nn=gf.nonan(l_m)
         lme.write(str(l_m_nn))
-        #scl.w
 
         l_r=gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn)
-        #l_r=gf.l_Ir(ll_r=script_L,ll_m=l_m)
-        #l_r,resl,rnkl,sl=lstsq(a=script_L_nn,b=l_m_nn)
 
         Theta_r_nn=gf.nonan(Theta_r)
         theta_m_nn=gf.nonan(theta_m)
 
-        #if len(theta_m)==1: theta_Ir=theta_m/Theta_r
         theta_Ir=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_m_nn)
-        #theta_Ir,rest,rnkt,st=lstsq(a=Theta_r_nn,b=theta_m_nn)
-        #print("theta_Ir \n"+str(theta_Ir))
+
 
 
         #Residuals
@@ -416,7 +483,6 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
         #print(l_del.shape)
 
         l_Ir_res=gf.l_Ir(ll_r=script_L_nn,ll_m=l_del)
-        #l_Ir_res,resld,rnkld,stld=lstsq(a=script_L_nn,b=l_del)
 
         #print("l_Ir w/ resids: \n"+str(l_Ir_res))
 
@@ -443,33 +509,21 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
         for x in range(l_Ir_final.shape[0]):
             lir=l_Ir_final[x,0]
             Ir_converted[x,0]=10.0**lir
-            
+
         #print("l_conv shape")
         #print(Ir_converted.shape)
-        '''
-        if np.isnan(Ir_converted[0])==True: 
-            print("BREAK!")
-            #print(alla1)
-            #print(alla2)
-            print(script_L)
-            print(l_m)
-            print(l_r)
-            print("ph")
-            print(theta_m)
-            print(Theta_r)
-            #print(Theta_r)
-            print(theta_Ir)
-            break
-            #continue
-        '''
+
         gf.dict_update(l_Ir_conv_dict,time+corr+itstr,Ir_converted)
 
         theta_Ir_final=theta_Ir+theta_Ir_res
         gf.dict_update(theta_Ir_dict,time+corr+itstr,theta_Ir_final)
 
-    scl.close()
-    lme.close()
+    #return theta_Ir_final, Ir_converted
+    '''
+    #scl.close()
+    #lme.close()
 
+    '''
     plt.clf()
     plt.imshow(script_L)
     plt.show()
@@ -479,6 +533,7 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.show()
     plt.savefig('aftermask.png',overwrite=True)
     plt.clf()
+    '''
 
     #print("l_r keys")
     #print(l_r_dict.keys())
@@ -493,7 +548,7 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     ELO_range=np.linspace(np.min(ELO),np.max(ELO),nint)
 
     #print("fkeys")
-    fkeys=theta_Ir_dict.keys()
+    fkeys=tir_ext.keys()
     tkeys=antinfo['timestamp']
     #print(fkeys)
 
@@ -504,12 +559,51 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     ndp=[]
     nda=[]
 
+    tt=np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)
+
+    phase_ext1=np.zeros((nant,1,ntimes),dtype=float)
+    amp_ext1=np.zeros((nant,1,ntimes),dtype=float)
+
+    for t_step in range(ntimes):
+        for k in range(nant):
+            amp_ext1[k,0,t_step]=lir_ext[str(t_step)+corr+itstr][k]
+            if k==refant: 
+                phase_ext1[k,0,t_step]=0
+            elif k<refant:
+                phase_ext1[k,0,t_step]=tir_ext[str(t_step)+corr+itstr][k]
+            elif k>refant:
+                phase_ext1[k,0,t_step]=tir_ext[str(t_step)+corr+itstr][k-1]
+
+    phase_ext=gf.nonan(phase_ext1)
+    amp_ext=gf.nonan(amp_ext1)
+
+    phase_cln1=np.zeros((nant,1,ntimes),dtype=float)
+    amp_cln1=np.zeros((nant,1,ntimes),dtype=float)
+
+    for t_step in range(ntimes):
+        for k in range(nant):
+            amp_cln1[k,0,t_step]=lir_cln[str(t_step)+corr+itstr][k]
+            if k==refant: 
+                phase_cln1[k,0,t_step]=0
+            elif k<refant:
+                phase_cln1[k,0,t_step]=tir_cln[str(t_step)+corr+itstr][k]
+            elif k>refant:
+                phase_cln1[k,0,t_step]=tir_cln[str(t_step)+corr+itstr][k-1]
+
+    phase_cln=gf.nonan(phase_cln1)
+    amp_cln=gf.nonan(amp_cln1)
+
     avga=np.empty((nant,1,len(ELO_range)-1))
     avgp=np.empty((nant,1,len(ELO_range)-1))
 
+    phase_arr=phase_ext-phase_cln
+    amp_arr=amp_ext/amp_cln
+    #phase_arr=phase_cln
+    #amp_arr=amp_cln
+
+    '''
     phase_arr=np.zeros((nant,1,ntimes),dtype=float)
     amp_arr=np.zeros((nant,1,ntimes),dtype=float)
-
 
     for t_step in range(ntimes):
         for k in range(nant):
@@ -520,7 +614,7 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
                 phase_arr[k,0,t_step]=theta_Ir_dict[str(t_step)+corr+itstr][k]
             elif k>refant:
                 phase_arr[k,0,t_step]=theta_Ir_dict[str(t_step)+corr+itstr][k-1]
-
+    '''
     antinfo['phase_'+corr+itstr]=np.squeeze(phase_arr)
     antinfo['amp_'+corr+itstr]=np.squeeze(amp_arr)
     plt.clf()
@@ -561,8 +655,9 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
         #plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png')
         #plt.clf()
     plt.savefig('./dplots/ndtstep_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png')
-    plt.clf()
     '''
+    plt.clf()
+
 
     for k in range(nant):
         for t_step in range(len(ELO_range)-1):
@@ -579,10 +674,10 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
             #print("amplist",amplist)
             nda=len(amplist)
             plt.scatter(ELO_range[t_step],nda)
-            avga[k,0,t_step]=np.nanmean(amplist)
-            avgp[k,0,t_step]=np.nanmean(phlist)
+            avga[k,0,t_step]=ma.mean(amplist)
+            avgp[k,0,t_step]=ma.mean(phlist)
 
-            if np.isnan(np.mean(amplist))==True or np.isnan(np.mean(phlist))==True:
+            if np.isnan(ma.mean(amplist))==True or np.isnan(ma.mean(phlist))==True:
                 if nda==0:
                     print("That's okay!")
                     avga[:,0,t_step]=np.nan
@@ -592,11 +687,11 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
                     nbad+=1
             else: nonan+=1
 
-            
+
             #if k==refant and nda!=0: avgp[k,0,t_step]=0
             #elif k!=refant and nda!=0: avgp[k,0,t_step]=np.nanmean(phlist)
             #elif k<refant and nda!=0: avgp[k,0,t_step]=np.nanmean(phlist)
-        plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png')
+        plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png')
         plt.clf()
 
 
@@ -610,12 +705,12 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
             #print(ELO_range[t_step+1])
             nda=len([antinfo['amp_'+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
             plt.scatter(ELO_range[t_step],nda)
-            ndb=len([l_Ir_conv_dict[str(t_step)+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+            ndb=len([lir_ext[str(t_step)+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
             plt.scatter(ELO_range[t_step],nda)
 
-        plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png')
+        #plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png')
         plt.clf()
-
+    plt.clf()
 
     #plt.clf()
     for a in range(nant):
@@ -624,13 +719,13 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+corr+itstr+'.png')
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
 
     plt.clf()
 
     for a in range(nant):
         plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
-        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gampavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png')
+        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gampavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
         #plt.ylim(bottom=0.0,top=3.5)
         plt.clf()
     plt.clf()
@@ -641,14 +736,14 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+corr+itstr+'.png')
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
 
 
     plt.clf()
 
     for a in range(nant):
         plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
-        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gphavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png')
+        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gphavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
     plt.clf()
 
 
@@ -657,14 +752,14 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+corr+itstr+'.png')
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
 
     plt.clf()
 
     for a in range(nant):
         plt.scatter(antinfo['timestamp'],antinfo['amp_'+corr+itstr][a],color='black',marker='x')
         plt.show()
-        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gamp'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png')
+        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gamp'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
         #plt.show()
         #plt.ylim(bottom=0.0,top=3.5)
         plt.clf()
@@ -675,14 +770,14 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+corr+itstr+'.png')
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+corr+itstr+'1.png')
 
     plt.clf()
 
     for a in range(nant):
         plt.scatter(antinfo['timestamp'],antinfo['phase_'+corr+itstr][a],color='red')
         plt.show()
-        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gph'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png')
+        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gph'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
         #plt.show()
         plt.clf()
     plt.clf()
@@ -692,7 +787,7 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+corr+itstr+'.png')
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
 
     plt.clf()
 
@@ -763,11 +858,11 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
                             else:
                                 gp2=antinfo['avg_phase_'+corr+itstr][iant2][t_step]
                             #newres[nb1,tb1]=pt*(ga1*ga2*np.exp(1.0j*(gp1-gp2)))
-                            newpt[nb1,tb1]=pt1*(ga1*ga2*np.exp(1.0j*(gp1-gp2)))
+                            newpt[nb1,tb1]=pt1/(ga1*ga2*np.exp(1.0j*(gp1-gp2)))
                             nb1+=1
             tb1+=1
-    ast.write("TB1\n")
-    ast.write(str(tb1))
+    #ast.write("TB1\n")
+    #ast.write(str(tb1))
 
     '''
     for t in range(nb1):
@@ -789,15 +884,15 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
         plt.plot(tt,np.abs(oldp),".",c='b')
         plt.plot(tt,np.abs(newv),".",c='r')
     plt.show()
-    plt.savefig("./dplots/visplot_"+auth+date+corr+itstr+".png",overwrite=True)
+    plt.savefig("./dplots/visplot_"+auth+date+corr+itstr+"1.png",overwrite=True)
     plt.clf()
-    
-    
+
+
     #gf.dict_update(antinfo,'newres_'+corr+itstr,newpt)
     gf.dict_update(antinfo1,'newvis_'+corr+itstr,newpt)
 
-    ast.close()
-    return newpt,antinfo1
+    #ast.close()
+    #return newpt,antinfo1
     #newres,x,antinfo,x
 
 
