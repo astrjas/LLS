@@ -291,7 +291,7 @@ def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
 
 ####################################################################
 
-def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant):
+def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     itstr=str(it)
 
     print(datams1)
@@ -937,6 +937,8 @@ datams1=dmsavg
 os.system('rm -rf '+dmsavg+' '+dmsavg+'.flagversions')
 split(vis=datams3,
       outputvis=dmsavg,
+      timebin='180s',
+      combine='scan,state',
       datacolumn='data',keepflags=False)
 
 rawdata=dmsavg
@@ -946,8 +948,8 @@ rawsplit=dmsprefix+'_rawsplit.ms'
 os.system('rm -rf '+rawsplit+' '+rawsplit+'.flagversions')
 split(vis=dmsavg,
       outputvis=rawsplit,
-      timebin='60s',
-      combine='scan,state',
+      #timebin='0s',
+      #combine='scan,state',
       datacolumn='data',keepflags=False)
 
 
@@ -1352,7 +1354,9 @@ while it<=0:
            interactive=0,
            cell='0.2arcsec')
 
-
+    mscm=dmsprefix+'_cmodel.ms'
+    os.system('rm -rf '+mscm+' '+mscm+'.flagversions')
+    split(vis=datams_ext3,outputvis=mscm,datacolumn='model',keepflags=False)
 
         
     '''
@@ -1385,7 +1389,7 @@ while it<=0:
     for p in range(npol):
         plt.clf()
         #newvis[p],newvis1[p],newantinfo,newantinfo1
-        newvis1[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=datams_ext3,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rawdata,rfant=refant)
+        newvis1[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=datams_ext3,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rawdata,rfant=refant,datams_cm=mscm)
         plt.clf()
         #newvis1[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=datams_ext3,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rawdata)
         #antinfo.update(newantinfo)
