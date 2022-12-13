@@ -8,6 +8,8 @@ path_to_gfunc='.'
 sys.path.insert(0, path_to_gfunc)
 import gfunc_c5 as gf
 from scipy.linalg import lstsq
+import numpy.ma as ma
+
 
 attn=0
 
@@ -101,6 +103,7 @@ def antfunc(dfile,it,pol,date):
 
     antinfo['goodt_'+corr+itstr]=alltim
     return antinfo,xx
+
 ####################################################################
 def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
     theta_r_dict={}
@@ -892,7 +895,7 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     gf.dict_update(antinfo1,'newvis_'+corr+itstr,newpt)
 
     #ast.close()
-    #return newpt,antinfo1
+    return newpt,antinfo1
     #newres,x,antinfo,x
 
 
@@ -910,7 +913,7 @@ target='sgr_apr07'
 case='allant'
 auth='Venki'
 refmeth='ref8'
-date='12082022_'+str(attn)
+date='12122022_'+str(attn)
 
 datams2=target+'_flagcor.ms'
 
@@ -927,7 +930,7 @@ datams3='sgr_apr07_flag.ms'
 dmsprefix0=datams3[:-3]
 
 #Setting name of file for time-averaged split file
-dmsavg=dmsprefix0+'_avg.ms'
+dmsavg=dmsprefix0+'_avg240.ms'
 
 #Getting file name
 dmsprefix=dmsavg[:-3]
@@ -937,9 +940,11 @@ datams1=dmsavg
 os.system('rm -rf '+dmsavg+' '+dmsavg+'.flagversions')
 split(vis=datams3,
       outputvis=dmsavg,
-      timebin='180s',
-      combine='scan,state',
+      timebin='240s',
+      combine='state,scan',
       datacolumn='data',keepflags=False)
+
+#mstransform(vis=datams3,outputvis=dmsavg,keepflags=False,timeaverage=True,timebin='240s',timespan='scan,state',datacolumn='data')
 
 rawdata=dmsavg
 clearcal(vis=rawdata,spw='0,1,2,3',addmodel=True)
@@ -1203,11 +1208,14 @@ while it<=0:
 
     #Cycle through each scan
     for s in scan:
+        print(s)
+        #if s==359:continue
         #UVM for extended structure leftover from fit
         sc=int(s)
         myuvfit_ext1 = uvm.uvmultifit(vis=datams_ext,
                     spw='0,1,2,3',
-                    scans=[[sc]],
+                    #scans=[[sc]],
+                    scans=[sc],
                     model=['delta'],
                     var=['0,0,p[0]'],
                     p_ini=[0.],
@@ -1220,7 +1228,8 @@ while it<=0:
         #UVM for model visibilities
         myuvfit_mod = uvm.uvmultifit(vis=datams_mod,
                     spw='0,1,2,3',
-                    scans=[[sc]], 
+                    #scans=[[sc]], 
+                    scans=[sc],
                     model=['delta'],
                     var=['0,0,p[0]'], 
                     p_ini=[0.], 
