@@ -12,6 +12,7 @@ import numpy.ma as ma
 
 
 attn=0
+tavg='240s'
 
 #try:
 #    import uvmultimodel
@@ -127,6 +128,7 @@ def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
 
     rfantind=np.where(antlist==refant)[0][0]
 
+    print("Finding bad antennas and phase and amp for each baseline...")
     for j in range(len(ainfo['timestamp'])):
         #Jacobian and measured phase matrix
         Theta_r=np.zeros((nbl,nant-1),dtype=int)
@@ -146,6 +148,7 @@ def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
         #Calculating number of antennas and baselines
         #-1 is to account for bad ants (ant1=-1 is not valid)    
         nb=0
+        #print("Finding bad antennas and phase and amp for each baseline...")
         for ant1 in np.unique(vdata['antenna1']):
             for ant2 in np.unique(vdata['antenna2']):
                 if ant1 < ant2:
@@ -160,6 +163,7 @@ def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
                         #print("PT",pt)
                         ph=np.angle(pt,deg=True)
                         amp=np.absolute(pt)
+                        #plt.scatter(j,ph)
                         if np.isnan(amp)==True: 
                             bantstore.append(iant1)
                             #bantstore.append(iant2)
@@ -192,6 +196,9 @@ def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
                             Theta_r[nb,iant1]=1
                             Theta_r[nb,iant2-1]=-1
                         nb+=1
+        #plt.show()
+        #plt.savefig('raw_ph_'+str(dfile[:-3])+'.png',overwrite=True)
+        #plt.clf()
         badance=np.full((nant,1),False,dtype=bool)
         for ia in range(nant):
             #print(bantstore.count(ia))
@@ -228,8 +235,8 @@ def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
         #lme.write(str(l_m_nn))
 
         #l_r=gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn)
-        print(len(np.where(l_m_nn.mask==False)[0]))
-        print(j)
+        #print(len(np.where(l_m_nn.mask==False)[0]))
+        #print(j)
         l_r=gf.l_Ir_mask(ll_r=script_L_nn,ll_m=l_m_nn,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,bdance=badance)
 
 
@@ -312,6 +319,18 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     print("data shape",visdata['data'].shape)
     ms.close()
 
+    ms.open(datams_cm,nomodify=True)
+    ms.selectinit(reset=True)
+    visdata_cm = ms.getdata(['antenna1','antenna2','data','axis_info','flag'],ifraxis=True)
+    #printing correlations
+    print(visdata_cm['axis_info']['corr_axis'])
+
+    #Squeeze data then close ms
+
+    visdata_cm['data'] = np.squeeze(visdata_cm['data'])
+    print("data_cm shape",visdata_cm['data'].shape)
+    ms.close()    
+
     allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
     antlist=np.unique(allants)
 
@@ -362,8 +381,9 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     #lme=open("lm_"+target+date+corr+itstr+".txt","w")
     #ast=open("astore_"+target+date+corr+itstr+".txt","w")
 
+    print("Solving for gains...")
     tir_ext,lir_ext=gsolve(nbl=nbl,nant=nant,vdata=visdata,varr=xx,ainfo=antinfo,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
-    tir_cln,lir_cln=gsolve(nbl=nbl,nant=nant,vdata=visdata,varr=xx_clean,ainfo=antinfo_clean,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
+    tir_cln,lir_cln=gsolve(nbl=nbl,nant=nant,vdata=visdata_cm,varr=xx_clean,ainfo=antinfo_clean,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
 
 
 
@@ -546,9 +566,13 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     #print(l_Ir_conv_dict['3537XX0'].shape)
     #print(l_r_dict['4XX0'].shape)
 
+    ##########BLOCKED TO RID AVG##############
+    '''
     ELO_diff=np.max(ELO)-np.min(ELO)
     nint=int(ELO_diff/240)
     ELO_range=np.linspace(np.min(ELO),np.max(ELO),nint)
+    '''
+    ###########################################
 
     #print("fkeys")
     fkeys=tir_ext.keys()
@@ -596,11 +620,15 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     phase_cln=gf.nonan(phase_cln1)
     amp_cln=gf.nonan(amp_cln1)
 
-    avga=np.empty((nant,1,len(ELO_range)-1))
-    avgp=np.empty((nant,1,len(ELO_range)-1))
+    ############################################
+    #avga=np.empty((nant,1,len(ELO_range)-1))
+    #avgp=np.empty((nant,1,len(ELO_range)-1))
+    #############################################
 
-    phase_arr=phase_ext-phase_cln
-    amp_arr=amp_ext/amp_cln
+    phase_arr1=phase_ext-phase_cln
+    amp_arr1=amp_ext/amp_cln
+    phase_arr=ma.masked_where(amp_arr1>4,phase_arr1)
+    amp_arr=ma.masked_where(amp_arr1>4,amp_arr1)
     #phase_arr=phase_cln
     #amp_arr=amp_cln
 
@@ -661,26 +689,34 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     '''
     plt.clf()
 
-
+    ##################################################################################################
+    ''''
+    print("Averaging gains...")
     for k in range(nant):
         for t_step in range(len(ELO_range)-1):
             tlist=[]
-            amplist=[]
-            phlist=[]
+            amplist=np.array([])
+            phlist=np.array([])
             for x in antinfo['timestamp']:
                 if x>ELO_range[t_step] and x<=ELO_range[t_step+1]: 
                     tlist.append(x)
                     ind=np.where(antinfo['timestamp']==x)
-                    amplist.append(antinfo['amp_'+corr+itstr][k][ind])
-                    phlist.append(antinfo['phase_'+corr+itstr][k][ind])
+                    amplist=ma.concatenate([amplist,antinfo['amp_'+corr+itstr][k][ind]])
+                    phlist=ma.concatenate([phlist,antinfo['phase_'+corr+itstr][k][ind]])
+                    #amplist.append(antinfo['amp_'+corr+itstr][k][ind])
+                    #phlist.append(antinfo['phase_'+corr+itstr][k][ind])
                 #print("ind",ind)
             #print("amplist",amplist)
+            #print("Avga",avga.shape)
+            #print("ELO",len(ELO))
             nda=len(amplist)
-            plt.scatter(ELO_range[t_step],nda)
-            avga[k,0,t_step]=ma.mean(amplist)
-            avgp[k,0,t_step]=ma.mean(phlist)
+            #print(nda)
+            #print(amplist)
+            #plt.scatter(ELO_range[t_step],nda)
+            avga[k,0,t_step]=amplist.mean()
+            avgp[k,0,t_step]=phlist.mean()
 
-            if np.isnan(ma.mean(amplist))==True or np.isnan(ma.mean(phlist))==True:
+            if np.isnan(amplist.mean())==True or np.isnan(phlist.mean())==True:
                 if nda==0:
                     print("That's okay!")
                     avga[:,0,t_step]=np.nan
@@ -689,75 +725,80 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
                 else: 
                     nbad+=1
             else: nonan+=1
-
+    '''
+    ###########################################################################
 
             #if k==refant and nda!=0: avgp[k,0,t_step]=0
             #elif k!=refant and nda!=0: avgp[k,0,t_step]=np.nanmean(phlist)
             #elif k<refant and nda!=0: avgp[k,0,t_step]=np.nanmean(phlist)
-        plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png')
-        plt.clf()
+        #plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png')
+        #plt.clf()
 
 
-    antinfo['avg_phase_'+corr+itstr]=np.squeeze(avgp)
-    antinfo['avg_amp_'+corr+itstr]=np.squeeze(avga)    
+    #antinfo['avg_phase_'+corr+itstr]=np.squeeze(avgp)
+    #antinfo['avg_amp_'+corr+itstr]=np.squeeze(avga)    
+    
+    antinfo['avg_phase_'+corr+itstr]=np.squeeze(phase_arr)
+    antinfo['avg_amp_'+corr+itstr]=np.squeeze(amp_arr) 
 
-    for k in range(nant):
-        for t_step in range(len(ELO_range)-1):
+    print("Plotting gains...")
+    #for k in range(nant):
+    #    for t_step in range(len(ELO_range)-1):
             #print("ELO_range")
             #print(ELO_range[t_step])
             #print(ELO_range[t_step+1])
-            nda=len([antinfo['amp_'+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
-            plt.scatter(ELO_range[t_step],nda)
-            ndb=len([lir_ext[str(t_step)+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
-            plt.scatter(ELO_range[t_step],nda)
+    #        nda=len([antinfo['amp_'+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+    #        plt.scatter(ELO_range[t_step],nda)
+    #        ndb=len([lir_ext[str(t_step)+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+    #        plt.scatter(ELO_range[t_step],nda)
 
         #plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png')
-        plt.clf()
-    plt.clf()
+        #plt.clf()
+    #plt.clf()
 
     #plt.clf()
-    for a in range(nant):
-        plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
-        plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
-    plt.legend()
-    plt.show()
+    #for a in range(nant):
+    #    plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
+    #    plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
+    #plt.legend()
+    #plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
+    #plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
 
-    plt.clf()
+    #plt.clf()
 
-    for a in range(nant):
-        plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
-        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gampavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
+    #for a in range(nant):
+    #    plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
+    #    plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gampavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
         #plt.ylim(bottom=0.0,top=3.5)
-        plt.clf()
-    plt.clf()
+    #    plt.clf()
+    #plt.clf()
 
 
-    for a in range(nant):
-        plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
-    plt.legend()
-    plt.show()
+    #for a in range(nant):
+    #    plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
+    #plt.legend()
+    #plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
-
-
-    plt.clf()
-
-    for a in range(nant):
-        plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
-        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gphavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
-    plt.clf()
+    #plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
 
 
-    for a in range(nant):
-        plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
-    plt.legend()
-    plt.show()
+    #plt.clf()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
+    #for a in range(nant):
+    #    plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
+    #    plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gphavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
+    #plt.clf()
 
-    plt.clf()
+
+    #for a in range(nant):
+    #    plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
+    #plt.legend()
+    #plt.show()
+
+    #plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
+
+    #plt.clf()
 
     for a in range(nant):
         plt.scatter(antinfo['timestamp'],antinfo['amp_'+corr+itstr][a],color='black',marker='x')
@@ -796,7 +837,7 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
 
 
     print("Intervals with pts:",nonan)
-    print("Total intervals:",len(ELO_range)-1)
+    #print("Total intervals:",len(ELO_range)-1)
     print("Bad baseline/antenna cases",nbad)
     print("Empty bins",nemp)
     print("Total points:",len(antinfo['timestamp']))
@@ -819,6 +860,8 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     antinfo1,xx1=antfunc(dfile=dvis,it=it,pol=pol,date=date)
 
     newpt=np.zeros_like(xx1)
+
+    print("Applying gains...") 
 
     for t_step in range(len(ELO_range)-1):
         tchunk=0
@@ -861,7 +904,7 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
                             else:
                                 gp2=antinfo['avg_phase_'+corr+itstr][iant2][t_step]
                             #newres[nb1,tb1]=pt*(ga1*ga2*np.exp(1.0j*(gp1-gp2)))
-                            newpt[nb1,tb1]=pt1/(ga1*ga2*np.exp(1.0j*(gp1-gp2)))
+                            newpt[nb1,tb1]=pt1/(ga1*ga2*np.exp(1.0j*(gp2-gp1)))
                             nb1+=1
             tb1+=1
     #ast.write("TB1\n")
@@ -883,11 +926,21 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     for t in range(nb1):
         oldp=np.array(xx1[t])
         #newp=np.array(newpt[t])
-        newv=np.array(newpt[t])
+        #newv=np.array(newpt[t])
         plt.plot(tt,np.abs(oldp),".",c='b')
+        #plt.plot(tt,np.abs(newv),".",c='r')
+    plt.show()
+    plt.savefig("./dplots/oldvisplot_"+auth+date+corr+itstr+".png",overwrite=True)
+    plt.clf()
+
+    for t in range(nb1):
+        #oldp=np.array(xx1[t])
+        #newp=np.array(newpt[t])
+        newv=np.array(newpt[t])
+        #plt.plot(tt,np.abs(oldp),".",c='b')
         plt.plot(tt,np.abs(newv),".",c='r')
     plt.show()
-    plt.savefig("./dplots/visplot_"+auth+date+corr+itstr+"1.png",overwrite=True)
+    plt.savefig("./dplots/newvisplot_"+auth+date+corr+itstr+".png",overwrite=True)
     plt.clf()
 
 
@@ -913,51 +966,60 @@ target='sgr_apr07'
 case='allant'
 auth='Venki'
 refmeth='ref8'
-date='12122022_'+str(attn)
+date='01202023_'+str(attn)
 
-datams2=target+'_flagcor.ms'
+#datams2=target+'_flagcor.ms'
 
-flagfile=datams2[:-3]+'_noflags.ms'
+#flagfile=datams2[:-3]+'_noflags.ms'
 #os.system('rm -rf '+flagfile)
 #split(vis=datams2,outputvis=flagfile,keepflags=False,datacolumn='data')
 
 #Initial data file name and name for channel-averaged file
 #datams1=target+'_flagcor_noflags.ms'
 #datams1=flagfile
-datams3='sgr_apr07_flag.ms'
+datams0='sgr_apr07_flag.ms'
 
 #Getting file name
-dmsprefix0=datams3[:-3]
+dmsprefix=datams0[:-3]
 
 #Setting name of file for time-averaged split file
-dmsavg=dmsprefix0+'_avg240.ms'
+resavg=dmsprefix+'_avgresres.ms'
 
 #Getting file name
-dmsprefix=dmsavg[:-3]
-datams1=dmsavg
+#dmsprefix=dmsavg[:-3]
+datams1=resavg
 
-#Splitting and channel averaging (if desired)
-os.system('rm -rf '+dmsavg+' '+dmsavg+'.flagversions')
-split(vis=datams3,
-      outputvis=dmsavg,
-      timebin='240s',
+
+#Splitting and channel averaging (if desired - no we need for resres)
+os.system('rm -rf '+resavg+' '+resavg+'.flagversions')
+split(vis=datams0,
+      outputvis=resavg,
+      timebin=tavg,
       combine='state,scan',
       datacolumn='data',keepflags=False)
 
 #mstransform(vis=datams3,outputvis=dmsavg,keepflags=False,timeaverage=True,timebin='240s',timespan='scan,state',datacolumn='data')
 
-rawdata=dmsavg
+rawdata=datams0
 clearcal(vis=rawdata,spw='0,1,2,3',addmodel=True)
 
 rawsplit=dmsprefix+'_rawsplit.ms'
 os.system('rm -rf '+rawsplit+' '+rawsplit+'.flagversions')
-split(vis=dmsavg,
+split(vis=datams0,
       outputvis=rawsplit,
       #timebin='0s',
       #combine='scan,state',
       datacolumn='data',keepflags=False)
 
-
+'''
+rsavg=rawsplit[:-3]+'_avg'+tavg+'.ms'
+os.system('rm -rf '+rsavg+' '+rsavg+'.flagversions')
+split(vis=datams0,
+      outputvis=rsavg,
+      timebin=tavg,
+      combine='scan,state',
+      datacolumn='data',keepflags=False)
+'''
 
 #Remove all previous attempts
 os.system('rm -rf '+dmsprefix+'_it*_cmodel.*')
@@ -978,10 +1040,10 @@ os.system('rm -rf '+dmsprefix+'_selfcal*_mod_it*.ms')
 os.system('rm -rf '+dmsprefix+'_selfcal*_ext2_it*.ms')
 
 
-clearcal(vis=datams3,spw='0,1,2,3',addmodel=True)
+clearcal(vis=datams0,spw='0,1,2,3',addmodel=True)
 
 
-ms.open(datams1,nomodify=True)
+ms.open(datams0,nomodify=True)
 visdata = ms.getdata(['antenna1','antenna2','data','flag','data_desc_id','sigma','axis_info'],ifraxis=True)
 visdata['data'] = np.squeeze(visdata['data'])
 ms.close()
@@ -1106,14 +1168,20 @@ split(vis=dmsavg,
 '''
 
 #Setting initial data file for analysis
-datams0=rawsplit
+datams1=rawsplit
 
 #Getting scan numbers from file
+#tb.open(datams1,nomodify=True)
 tb.open(datams0,nomodify=True)
 scan = tb.getcol('SCAN_NUMBER')
 
 #Creating array to store residuals
-visdata0 = tb.getcol('DATA')
+#visdata0 = tb.getcol('DATA')
+#resres=np.zeros_like(visdata0)
+tb.close()
+
+tb.open(resavg,nomodify=True)
+visdata0=tb.getcol('DATA')
 resres=np.zeros_like(visdata0)
 tb.close()
 
@@ -1124,6 +1192,7 @@ print(scan)
 
 
 #Calculating RMS of data for CLEAN threshold
+#ms.open(datams1,nomodify=True)
 ms.open(datams0,nomodify=True)
 sigs=ms.getdata(['sigma'])
 fsigs=np.asarray(sigs['sigma']).flatten()
@@ -1183,7 +1252,21 @@ iref=np.where(antlist==refant)[0][0]
 #The wily (formerly) infinite while loop
 #while(1):
 while it<=0:
+    rdavg=dmsprefix+'_rdata_avg'+tavg+'.ms'
+    os.system('rm -rf '+rdavg+' '+rdavg+'.flagversions')
+    split(vis=rawdata,
+          outputvis=rdavg,
+          timebin=tavg,
+          combine='state,scan',
+          datacolumn='data',keepflags=False)
+    clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
+
     e.write("ITERATION "+str(it)+"\n")
+
+    ms.open(rdavg)
+    adata=ms.getdata(['data'],ifraxis=True)
+    adata['data']=np.squeeze(adata['data'])
+    ms.close()
 
     #Declaring empty arrays for mod UVM flux and error
     muvmf=np.array([])
@@ -1196,11 +1279,11 @@ while it<=0:
     
     #Splitting and creating the files
     os.system('rm -rf '+datams_ext)
-    split(vis=datams0,outputvis=datams_ext,datacolumn='data',keepflags=False)
+    split(vis=datams1,outputvis=datams_ext,datacolumn='data',keepflags=False)
 
     #cvis.append(str(datams_mod))
     os.system('rm -rf '+datams_mod)
-    split(vis=datams0,outputvis=datams_mod,datacolumn='data',keepflags=False)
+    split(vis=datams1,outputvis=datams_mod,datacolumn='data',keepflags=False)
 
     #Clearing/creating corrected and model columns
     clearcal(vis=datams_ext,spw='0,1,2,3',addmodel=True)
@@ -1208,7 +1291,7 @@ while it<=0:
 
     #Cycle through each scan
     for s in scan:
-        print(s)
+        #print(s)
         #if s==359:continue
         #UVM for extended structure leftover from fit
         sc=int(s)
@@ -1363,9 +1446,31 @@ while it<=0:
            interactive=0,
            cell='0.2arcsec')
 
-    mscm=dmsprefix+'_cmodel.ms'
+    mscm=dmsprefix+'_cmodel_avg'+tavg+'_it'+'{0:02d}'.format(it)+'.ms'
     os.system('rm -rf '+mscm+' '+mscm+'.flagversions')
-    split(vis=datams_ext3,outputvis=mscm,datacolumn='model',keepflags=False)
+    split(vis=datams_ext3,
+          outputvis=mscm,
+          timebin=tavg,
+          combine='state,scan',
+          datacolumn='model',keepflags=False)
+
+    dmodavg=datams_mod[:-3]+'avg'+tavg+'_it'+'{0:02d}'.format(it)+'.ms'
+    #Splitting and channel averaging (if desired)
+    os.system('rm -rf '+dmodavg+' '+dmodavg+'.flagversions')
+    split(vis=datams_mod,
+          outputvis=dmodavg,
+          timebin=tavg,
+          combine='state,scan',
+          datacolumn='model',keepflags=False)
+
+    dme3avg=datams_ext3[:-3]+'avg'+tavg+'_it'+'{0:02d}'.format(it)+'.ms'
+    #Splitting and channel averaging (if desired)
+    os.system('rm -rf '+dme3avg+' '+dme3avg+'.flagversions')
+    split(vis=datams_ext3,
+          outputvis=dme3avg,
+          timebin=tavg,
+          combine='state,scan',
+          datacolumn='data',keepflags=False)
 
         
     '''
@@ -1390,15 +1495,23 @@ while it<=0:
              gaintable=['phaseamp'+str(it)+'.cal'])
              #interp='linear')
     '''
+
+    #ms.open(rsavg,nomodify=True)
+    #avgdata=ms.getdata(['data'],ifraxis=True)
+    #ms.close()
+
     #newvis=np.zeros_like(visdata['data'])
-    newvis1=np.zeros_like(visdata['data'])
+    #Zeros like data array for averaged data
+    newvis1=np.zeros_like(adata['data'])
+    #newvis1=np.zeros_like(avgdata['data'])
     #antinfo=dict()
     antinfo1=dict()
     plt.clf()
     for p in range(npol):
         plt.clf()
         #newvis[p],newvis1[p],newantinfo,newantinfo1
-        newvis1[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=datams_ext3,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rawdata,rfant=refant,datams_cm=mscm)
+        #newvis1[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=datams_ext3,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rawdata,rfant=refant,datams_cm=mscm)
+        newvis1[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=dme3avg,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rdavg,rfant=refant,datams_cm=mscm)
         plt.clf()
         #newvis1[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=datams_ext3,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rawdata)
         #antinfo.update(newantinfo)
@@ -1423,7 +1536,8 @@ while it<=0:
     ms.close()
     '''
 
-    ms.open(rawdata,nomodify=False)
+    ms.open(rdavg,nomodify=False)
+    #ms.open(rawdata,nomodify=False)
     nv1=ms.getdata(['corrected_data'],ifraxis=True)
     nv1['corrected_data'][:,0,:,:]=newvis1
     ms.putdata(nv1)
@@ -1432,7 +1546,8 @@ while it<=0:
     print(ftnv1)
     ms.close()
 
-    ms.open(rawdata,nomodify=True)
+    #ms.open(rawdata,nomodify=True)
+    ms.open(rdavg,nomodify=True)
     nnv1=ms.getdata(['corrected_data'],ifraxis=True)
     ftnnv1=nnv1['corrected_data'][0]
     e.write(str(ftnnv1)+"\n")
@@ -1442,9 +1557,9 @@ while it<=0:
 
 
     #Dirty image of gain-calibrated data
-    imname3=dmsprefix+'_it'+'{0:02d}'.format(it)+'_selfcalmodel'
+    imname3=dmsprefix+'_it'+'{0:02d}'.format(it)+'_gainappl'
     os.system('rm -rf '+imname3+'.*')
-    r2c1=tclean(vis=rawdata,
+    r2c1=tclean(vis=rdavg,#vis=rawdata,
            imagename=imname3,
            spw='0,1,2,3',
            datacolumn='corrected',
@@ -1455,8 +1570,9 @@ while it<=0:
            interactive=0,
            cell='0.2arcsec')
 
+    '''
     #Dirty image of x gain-calibrated residuals x CLEAN model
-    imname4=dmsprefix+'_it'+'{0:02d}'.format(it)+'_selfcalmodel_ext'
+    imname4=dmsprefix+'_it'+'{0:02d}'.format(it)+'_gainappl_ext'
     os.system('rm -rf '+imname4+'.*')
     r2c2=tclean(vis=datams_ext3,
            imagename=imname4,
@@ -1468,7 +1584,7 @@ while it<=0:
            imsize=[300,300],
            interactive=0,
            cell='0.2arcsec')
-
+    '''
 
     #Split again so gain-calibrated data and residuals are the data
     dms_selfcal=dmsprefix+"_selfcal_it"+str(it)+".ms"
@@ -1479,10 +1595,13 @@ while it<=0:
     dms_selfcalf_ext=dms_selfcal_ext+'.flagversions'
 
     os.system('rm -rf '+dms_selfcal+' '+dms_selfcalf)
-    split(vis=rawdata,outputvis=dms_selfcal,datacolumn='corrected',keepflags=False)
+    #split(vis=rawdata,outputvis=dms_selfcal,datacolumn='corrected',keepflags=False)
+    split(vis=rdavg,outputvis=dms_selfcal,datacolumn='corrected',keepflags=False)
+
 
     os.system('rm -rf '+dms_selfcal_copy+' '+dms_selfcalf_copy)
-    split(vis=rawdata,outputvis=dms_selfcal_copy,datacolumn='corrected',keepflags=False)
+    #split(vis=rawdata,outputvis=dms_selfcal_copy,datacolumn='corrected',keepflags=False)
+    split(vis=rdavg,outputvis=dms_selfcal_copy,datacolumn='corrected',keepflags=False)
 
     #os.system('rm -rf '+dms_selfcal_ext+' '+dms_selfcalf_ext)
     #split(vis=datams_ext3,outputvis=dms_selfcal_ext,datacolumn='corrected',keepflags=False)
@@ -1493,7 +1612,8 @@ while it<=0:
 
     #Pulling (not) gain-calibrated residuals to add to previous iterations
     #tb.open(dms_selfcal_ext)
-    tb.open(datams_ext3)
+    #tb.open(datams_ext3)
+    tb.open(dme3avg)
     resids=tb.getcol('DATA')
     tb.close()
     resres+=resids
@@ -1575,7 +1695,7 @@ while it<=0:
     datams0=dms_selfcal_copy
     rawdata=dms_selfcal
     clearcal(vis=rawdata,spw='0,1,2,3',addmodel=True)
-
+    #clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
 
     print("MAX:",madmax)
     if stop==2: break
@@ -1588,7 +1708,7 @@ print("Performed %i iterations" %(it))
 
 
 dms_selfcal1=dmsprefix+"_selfcal_copy_it"+str(it-1)+".ms"
-dms_selfcal1_ext=dmsprefix+"_selfcal_ext_it"+str(it-1)+".ms"
+#dms_selfcal1_ext=dmsprefix+"_selfcal_ext_it"+str(it-1)+".ms"
 
 
 tb.open(dms_selfcal1_ext)
@@ -1620,11 +1740,11 @@ muvmferr=np.array([])
 datams_mod=dmsprefix+'_mod_final.ms'
 
 #cvis.append(str(datams_mod))
-os.system('rm -rf '+datams_mod)
-split(vis=datams_ext3_sc,outputvis=datams_mod,datacolumn='data',keepflags=False)
+#os.system('rm -rf '+datams_mod)
+#split(vis=datams_ext3_sc,outputvis=datams_mod,datacolumn='data',keepflags=False)
 
 #Clearing/creating corrected and model columns
-clearcal(vis=datams_mod,spw='0,1,2,3',addmodel=True) 
+#clearcal(vis=datams_mod,spw='0,1,2,3',addmodel=True) 
 
 #Cycle through each scan
 for s in scan:
