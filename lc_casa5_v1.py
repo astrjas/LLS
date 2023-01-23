@@ -373,17 +373,19 @@ def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
     plt.savefig('validants.png',overwrite=True)
     plt.show()
     plt.clf()
-    return theta_Ir_dict, l_Ir_conv_dict, theta_m_dict, theta_m_nn_dict, theta_r_dict, theta_r_nn_dict
+    return theta_Ir_dict, l_Ir_conv_dict
 
 
 pol=0
 corr='XX'
-datams1='sgr_apr07_flag_ext3_it00.ms'
-datams_cm='sgr_apr07_flag_ext3_it00_cmsplit.ms'
+#datams1='sgr_apr07_flag_ext3_it00.ms'
+datams1='sgr_apr07_flag_ext3_it00avg240s_it00.ms'
+#datams_cm='sgr_apr07_flag_ext3_it00_cmsplit.ms'
+datams_cm='sgr_apr07_flag_cmodel_avg240s_it00.ms'
 target='sgr_apr07'
 case='ref8'
 refmeth='manual'
-date='12072022_1'
+date='01232022'
 it=0
 dvis='sgr_apr07_flag.ms'
 rfant=8
@@ -643,9 +645,9 @@ plt.clf()
 #print(l_Ir_conv_dict['3537XX0'].shape)
 #print(l_r_dict['4XX0'].shape)
 
-ELO_diff=np.max(ELO)-np.min(ELO)
-nint=int(ELO_diff/240)
-ELO_range=np.linspace(np.min(ELO),np.max(ELO),nint)
+#ELO_diff=np.max(ELO)-np.min(ELO)
+#nint=int(ELO_diff/240)
+#ELO_range=np.linspace(np.min(ELO),np.max(ELO),nint)
 
 #print("fkeys")
 fkeys=tir_ext.keys()
@@ -758,14 +760,14 @@ plt.savefig('./dplots/ndtstep_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.
 '''
 plt.clf()
 
-
+'''
 for k in range(nant):
-    for t_step in range(len(ELO_range)-1):
+    #for t_step in range(len(ELO_range)-1):
         tlist=[]
         amplist=[]
         phlist=[]
-        for x in antinfo['timestamp']:
-            if x>ELO_range[t_step] and x<=ELO_range[t_step+1]: 
+        #for x in antinfo['timestamp']:
+            #if x>ELO_range[t_step] and x<=ELO_range[t_step+1]: 
                 tlist.append(x)
                 ind=np.where(antinfo['timestamp']==x)
                 amplist.append(antinfo['amp_'+corr+itstr][k][ind])
@@ -793,11 +795,11 @@ for k in range(nant):
         #elif k<refant and nda!=0: avgp[k,0,t_step]=np.nanmean(phlist)
     plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png')
     plt.clf()
+'''
 
-
-antinfo['avg_phase_'+corr+itstr]=np.squeeze(avgp)
-antinfo['avg_amp_'+corr+itstr]=np.squeeze(avga)    
-
+antinfo['avg_phase_'+corr+itstr]=np.squeeze(phase_arr)
+antinfo['avg_amp_'+corr+itstr]=np.squeeze(amp_arr)    
+'''
 for k in range(nant):
     for t_step in range(len(ELO_range)-1):
         #print("ELO_range")
@@ -855,7 +857,7 @@ plt.show()
 plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
 
 plt.clf()
-
+'''
 for a in range(nant):
     plt.scatter(antinfo['timestamp'],antinfo['amp_'+corr+itstr][a],color='black',marker='x')
     plt.show()
@@ -893,7 +895,7 @@ plt.clf()
 
 
 print("Intervals with pts:",nonan)
-print("Total intervals:",len(ELO_range)-1)
+#print("Total intervals:",len(ELO_range)-1)
 print("Bad baseline/antenna cases",nbad)
 print("Empty bins",nemp)
 print("Total points:",len(antinfo['timestamp']))
@@ -917,21 +919,23 @@ antinfo1,xx1=antfunc(dfile=dvis,it=it,pol=pol,date=date)
 
 newpt=np.zeros_like(xx1)
 
-for t_step in range(len(ELO_range)-1):
-    tchunk=0
-    listt=[]
-    for t in antinfo['timestamp']:
-        if t>=ELO_range[t_step] and t<ELO_range[t_step+1]: 
-            tchunk+=1
-            listt.append(t)
+#for t_step in range(len(ELO_range)-1):
+for t_step in range(len(antinfo['timestamp'])):
+    #tchunk=0
+    #listt=[]
+    #for t in antinfo['timestamp']:
+        #if t>=ELO_range[t_step] and t<ELO_range[t_step+1]: 
+            #tchunk+=1
+            #listt.append(t)
     #[antinfo['timestamp'][x] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])]
     #for i in range(len(tchunk)):
-    for i in range(tchunk):
-        thistime=(visdata1['axis_info']['time_axis']['MJDseconds']==listt[i])
-        time=i
+    #for i in range(tchunk):
+        #thistime=(visdata1['axis_info']['time_axis']['MJDseconds']==listt[i])
+        thistime=(visdata1['axis_info']['time_axis']['MJDseconds']==antinfo['timestamp'][t_step])
+        time=t_step
         #indt=np.where(visdata1['axis_info']['time_axis']['MJDseconds']==listt[i])
 
-        gt=antinfo['goodt_'+corr+itstr][i]
+        gt=antinfo['goodt_'+corr+itstr][t_step]
 
         #Pulling antennas that are bad for this time
         #Calculating number of antennas and baselines
