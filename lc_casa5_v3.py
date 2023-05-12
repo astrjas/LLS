@@ -15,6 +15,7 @@ import pdb
 from multiprocessing import Process
 from contextlib import closing
 import math
+import json
 
 attn=0
 MJDdate=58232.00000000*3600.*24.
@@ -181,24 +182,6 @@ def antfunc(dfile,it,pol,date,case):
 def gsolve(nbl,nant,vdata,varr,varrcln,antlist,corr,itstr,refant,tba1,tba2,tbt,tbspw,vwt):#ainfo
     #gst0=time.time()
     plt.clf()
-    #theta_r_dict={}
-    #theta_m_dict={}
-    #theta_Ir_dict={}
-    #theta_del_dict={}
-    #theta_rms_dict={}
-
-    #script_L_dict={}
-    #script_L_nn_dict={}
-    #theta_r_nn_dict={}
-    #l_m_dict={}
-    #l_m_nn_dict={}
-    #theta_m_nn_dict={}
-    #l_r_dict={}
-    #l_del_dict={}
-    #l_rms_dict={}
-    #l_Ir_conv_dict={}
-    #all_bdance={}
-    #all_bdance_ph={}
     vism_dict={}
     jac_dict={}
     wt_dict={}
@@ -227,36 +210,14 @@ def gsolve(nbl,nant,vdata,varr,varrcln,antlist,corr,itstr,refant,tba1,tba2,tbt,t
             aAllTime=np.concatenate((a1Time,a2Time))
             #print(aAllTime)
             exclAnts1=np.array(list(set(antlist)-set(aAllTime)))
-            #print(exclAnts1)
             goodAnts=np.sort(np.array(list(set(antlist)-set(exclAnts1))))
-            #print(goodAnts)
             extraAnts=gf.bl_checker(goodAnts,varr,tba1,tba2,tbt,tbspw,untime[j],s)
-            #may need to add here
-            #print(extraAnts)
             exclAnts=np.unique(np.concatenate((exclAnts1,extraAnts))).astype(int)
-            #print(exclAnts)
-            #print(len(exclAnts))
-            #pdb.set_trace()
-            #nant=len(np.unique(aAllTime))
-            #nbl=(nant*(nant-1))/2
-
-            #Jacobian and measured phase matrix
-            #Theta_r=np.zeros((nbl,nant-1),dtype=int)
-            #bad_T=np.zeros((nbl,nant-1),dtype=int)
-            #theta_m=np.zeros((nbl,1),dtype=float)
-
-            #Defining Jacobian and measured amp matrix
-            #script_L=np.zeros((nbl,nant),dtype=int)
-            #bad_L=np.zeros((nbl,nant),dtype=int)
-            #l_m=np.zeros((nbl,1),dtype=float)
-            #astore=np.zeros((nbl,1),dtype=float)
-            #bantstore=[]
-            #blstore=[]
 
             #New Jacobian and vis chunks
             jac=np.zeros((2*nbl,nant),dtype=int)
             vism=np.zeros((2*nbl,1),dtype=complex)
-            wt=np.zeros((2*nbl,2*nbl),dtype=complex)
+            wt=np.zeros((2*nbl,2*nbl),dtype=float)
 
             #print(time)
             #thistime=(vdata['axis_info']['time_axis']['MJDseconds']==ainfo['timestamp'][j])
@@ -265,99 +226,49 @@ def gsolve(nbl,nant,vdata,varr,varrcln,antlist,corr,itstr,refant,tba1,tba2,tbt,t
             #Calculating number of antennas and baselines
             #-1 is to account for bad ants (ant1=-1 is not valid)    
             nb=0
-            #for ant1 in np.unique(vdata['antenna1']):
             for ant1 in np.unique(tba1):
                 for ant2 in np.unique(tba2):
-                #for ant2 in np.unique(vdata['antenna2']):
                     if ant1 < ant2:
-                        #thisbase = (vdata['antenna1']==ant1) & (vdata['antenna2']==ant2)
                         thispt= (tba1==ant1) & (tba2==ant2) & (tbt==untime[j]) & (tbspw==s)
                         iant1=np.where(antlist==ant1)[0][0]
-                        #print(iant1)
                         iant2=np.where(antlist==ant2)[0][0]
-                        #print(iant2)
                         if thispt.sum()==0 or ant1 in exclAnts or ant2 in exclAnts:
-                            #l_m[nb,0]=np.nan
-                            #astore[nb,0]=np.nan
                             vism[nb,0]=np.nan
                             vism[nb+nbl,0]=np.nan
 
-                            #script_L[nb,iant1]=1#1
-                            #script_L[nb,iant2]=1#1
                             jac[nb,iant1]=1
                             jac[nb,iant2]=1
 
 
-                            #PHASE STUFF
-                            #theta_m[nb,0]=np.nan
 
                             if ant1==refant: jac[nb+nbl,iant2]=-1#-1
                             if ant2==refant: jac[nb+nbl,iant1]=1#1
-                            #if ant1!=refant and ant1>refant:
-                            #    Theta_r[nb,iant1-1]=1#1
-                            #    Theta_r[nb,iant2-1]=-1#-1
                             else:
                                 jac[nb+nbl,iant1]=1#1
                                 jac[nb+nbl,iant2]=-1#-1
-                            #if (ant1!=refant and (ant2>refant and ant1<refant)):
-                            #    Theta_r[nb,iant1]=1#1
-                            #    Theta_r[nb,iant2-1]=-1
                             wt[nb,nb]=np.nan
                             wt[nb+nbl,nb+nbl]=np.nan
                             nb+=1
                             continue
                         if thispt.sum()>0:
-                            #potential 0 after thisbase and thistime
-                            #pt=varr[thisbase][0][j]
                             pt=varr[thispt][0]
                             ptc=varrcln[thispt][0]
                             ptw=vwt[thispt][0]
-                            #print("PT",pt)
-                            #print("PTC",ptc)
-                            #pdb.set_trace()
-                            #ph=np.angle(pt,deg=False)
-                            #phc=np.angle(ptc,deg=False)
-                            #amp=abs(pt)
-                            #ampc=abs(ptc)
+
                             rl=pt.real
                             rlc=ptc.real
                             im=1.0j*pt.imag
                             imc=1.0j*ptc.imag
-                            #pdb.set_trace()
-                            #if np.isnan(amp)==True: 
-                            #    bantstore.append(iant1)
-                            #    blstore.append(nb)
-                            #    #bantstore.append(iant2)
-                            #    bad_L[nb,iant1]=2
-                            #    bad_L[nb,iant2]=2
 
-                            #    if ant1==refant: bad_T[nb,iant2-1]=2
-                            #    if ant2==refant: bad_T[nb,iant1]=2
-                            #    if ant1!=refant and ant1>refant:
-                            #        bad_T[nb,iant1-1]=2
-                            #        bad_T[nb,iant2-1]=2
-                            #    if ant1!=refant and ant2<refant:
-                            #        bad_T[nb,iant1]=2
-                            #        bad_T[nb,iant2]=2
-                            #    if (ant1!=refant and (ant2>refant and ant1<refant)):
-                            #        bad_T[nb,iant1]=2
-                            #        bad_T[nb,iant2-1]=2
-                            #print("AMP",amp)
-
-                            #if iant1==5 or iant2==5:
-                                #amp*=4
-                                #ph+=90
-                                #print("bing")
 
                             vism[nb,0]=rl-rlc
                             vism[nb+nbl,0]=im-imc
-                            #astore[nb,0]=amp
+
 
                             jac[nb,iant1]=1
                             jac[nb,iant2]=1
 
-                            #PHASE STUFF
-                            #theta_m[nb,0]=ph-phc
+
 
                             if ant1==refant: jac[nb+nbl,iant2]=-1
                             if ant2==refant: jac[nb+nbl,iant1]=1
@@ -369,54 +280,10 @@ def gsolve(nbl,nant,vdata,varr,varrcln,antlist,corr,itstr,refant,tba1,tba2,tbt,t
                             wt[nb+nbl,nb+nbl]=ptw
                                 
                             nb+=1
-            #print(j)
-            #badance=np.full((nant,1),False,dtype=bool)
-            #badbl=np.full((nbl,1),False,dtype=bool)
-            #for ia in range(nant):
-            #    #print(bantstore.count(ia))
-            #    #if ia==38: 
-            #    #    if bantstore.count(ia)>0: badance[ia,0]=True
-            #    #else:
-            #    #if bantstore.count(ia)==nant-1: badance[ia,0]=True
-            #    #if ia in bantstore: badance[ia,0]=True
-            #    #if bantstore.count(ia)==(nant-1)-ia: 
-            #    #    badance[ia,0]=True
-            #    #else: print("bonk!")
-            #for ib in range(nbl):
-            #    if ib in blstore: badbl[ib,0]=True
-            #print(len(blstore))
-            #pdb.set_trace()    
-            #badance=np.unique(bantstore)
-            #print(badance)
-            #plt.scatter(j,len(np.where(badance==True)[0]))
-            #gf.dict_update(all_bdance,time+corr+itstr+spwstr,badance)
 
-
-            #gf.dict_update(theta_r_dict,time+corr+itstr+spwstr,Theta_r)
-            #gf.dict_update(theta_m_dict,time+corr+itstr+spwstr,theta_m)
             gf.dict_update(vism_dict,time+corr+itstr+spwstr,vism)
             gf.dict_update(jac_dict,time+corr+itstr+spwstr,jac)
             gf.dict_update(wt_dict,time+corr+itstr+spwstr,wt)
-
-            #scl.write("\n\n")
-
-            #lme.write("\n\n")
-
-            #ast.write(str(astore))
-            #ast.write("\n\n")
-            #help me mark I hope
-            #pdb.set_trace()
-
-            #script_L_nn=gf.nonan(script_L)
-            #gf.dict_update(script_L_dict,time+corr+itstr+spwstr,script_L)
-            #scl.write(str(script_L_nn))
-            #l_m_nn=gf.nonan(l_m)
-            #gf.dict_update(l_m_dict,time+corr+itstr+spwstr,l_m)
-            #lme.write(str(l_m_nn))
-
-            #gf.dict_update(script_L_nn_dict,time+corr+itstr+spwstr,script_L_nn)
-            #gf.dict_update(l_m_nn_dict,time+corr+itstr+spwstr,l_m_nn)
-
 
             vism_nn=gf.nonan(vism)
             jac_nn=gf.nonan(jac)
@@ -426,116 +293,28 @@ def gsolve(nbl,nant,vdata,varr,varrcln,antlist,corr,itstr,refant,tba1,tba2,tbt,t
             gf.dict_update(jac_nn_dict,time+corr+itstr+spwstr,jac_nn)
             gf.dict_update(wt_nn_dict,time+corr+itstr+spwstr,wt_nn)
 
-            #l_r=gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn)
-            #print("wherelmnnfalse",len(np.where(l_m_nn.mask==False)[0]))
-            #print("j",j)
             vis_r=gf.realim_mask(vism=vism_nn,jac=jac_nn,nant=nant,antlist=antlist,exclAnts=exclAnts,wt=wt_nn)
-            #l_r=gf.l_Ir_nan(ll_r=script_L,ll_m=l_m,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,bdance=badance,bbl=badbl)
 
             gf.dict_update(vis_r_dict,time+corr+itstr+spwstr,vis_r)
 
-            #pdb.set_trace()
 
-            #Theta_r_nn=gf.nonan(Theta_r)
-            #gf.dict_update(theta_r_nn_dict,time+corr+itstr+spwstr,Theta_r_nn)
-            #theta_m_nn=gf.nonan(theta_m)
-            #gf.dict_update(theta_m_nn_dict,time+corr+itstr+spwstr,theta_m_nn)
+    #with open('data/vism_nn_dict.pickle', 'wb') as f:
+    #    pickle.dump(vism_nn_dict, f)
+    #with open('data/jac_nn_dict.pickle', 'wb') as f:
+    #    pickle.dump(jac_nn_dict, f)
+    #with open('data/wt_nn_dict.pickle', 'wb') as f:
+    #    pickle.dump(wt_nn_dict, f)
+    #with open('data/vis_r_dict.pickle', 'wb') as f:
+    #    pickle.dump(vis_r_dict, f)    
 
-
-            #theta_Ir=gf.th_Ir_mask(Th_r=Theta_r_nn,th_m=theta_m_nn,rfantind=rfantind,nant=nant,bbl=badbl,antlist=antlist,exclAnts=exclAnts)
-            #theta_Ir=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_m_nn)
-
-
-
-            #Residuals
-            #l_del=l_m_nn-np.matmul(script_L_nn,l_r)
-            #print("l_del \n"+str(l_del))
-            #gf.dict_update(l_del_dict,time+corr+itstr+spwstr,l_del)
-
-            #print(l_del.shape)
-
-            #l_Ir_res=gf.l_Ir_mask(ll_r=script_L_nn,ll_m=l_del,nant=nant,bbl=badbl,antlist=antlist,exclAnts=exclAnts)
-
-            #print("l_Ir w/ resids: \n"+str(l_Ir_res))
-
-            #theta_del=theta_m_nn-ma.dot(Theta_r_nn,theta_Ir)
-            #print("theta_del \n"+str(theta_del))
-            #gf.dict_update(theta_del_dict,time+corr+itstr+spwstr,theta_del)
-
-            #theta_Ir_res=gf.th_Ir_mask(Th_r=Theta_r_nn,th_m=theta_del,rfantind=rfantind,nant=nant,bbl=badbl,antlist=antlist,exclAnts=exclAnts)
-            #theta_Ir_res=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_del)
-            #theta_Ir_res,restd,rnktd,stdel=lstsq(a=Theta_r_nn,b=theta_del)
-            #print("theta_Ir w/ resids: \n"+str(theta_Ir_res))
-
-
-            #l_Ir_final=l_r+l_Ir_res
-            #ast.write(str(l_Ir_final))
-            #l_Ir_final=l_r
-            #print("l_ir_shape")
-            #print(l_Ir_final.shape)
-            #gf.dict_update(l_r_dict,time+corr+itstr+spwstr,l_Ir_final)
-            #print("final amps (log form) \n"+str(l_Ir_final))
-
-            #with open('data/model_redshifts.pickle', 'rb') as f:
-            #    redshifts = pickle.load(f)
-
-            #Ir_converted=np.zeros_like(l_Ir_final)
-
-            #Ir_converted=np.vstack([10.0**x for x in l_Ir_final])
-            #for x in range(l_Ir_final.shape[0]):
-            #    lir=l_Ir_final[x,0]
-            #    Ir_converted[x,0]=10.0**lir
-
-            #print("l_conv shape")
-            #print(Ir_converted.shape)
-
-            #gf.dict_update(l_Ir_conv_dict,time+corr+itstr+spwstr,Ir_converted)
-
-            #theta_Ir_final=theta_Ir+theta_Ir_res
-            #theta_Ir_final=theta_Ir
-            #gf.dict_update(theta_Ir_dict,time+corr+itstr+spwstr,theta_Ir_final)
-
-
-          #plt.show()
-    '''
-    with open('data/all_bdance_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(all_bdance, f)
-    with open('data/theta_Ir_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(theta_Ir_dict, f)
-    with open('data/l_Ir_conv_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(l_Ir_conv_dict, f)
-    with open('data/l_r_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(l_r_dict, f)
-    with open('data/theta_del_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(theta_del_dict, f)
-    with open('data/theta_r_nn_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(theta_r_nn_dict, f)
-    with open('data/theta_m_nn_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(theta_m_nn_dict, f)
-    with open('data/l_del_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(l_del_dict, f)
-    with open('data/theta_r_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(theta_r_dict, f)
-    with open('data/theta_m_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(theta_m_dict, f)
-    with open('data/script_L_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(script_L_dict, f)
-    with open('data/l_m_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(l_m_dict, f)
-    with open('data/script_L_nn_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(script_L_nn_dict, f)
-    with open('data/l_m_nn_dict_'+case+'.pickle', 'wb') as f:
-        pickle.dump(l_m_nn_dict, f)
-    '''
-    with open('data/vism_nn_dict.pickle', 'wb') as f:
-        pickle.dump(vism_nn_dict, f)
-    with open('data/jac_nn_dict.pickle', 'wb') as f:
-        pickle.dump(jac_nn_dict, f)
-    with open('data/wt_nn_dict.pickle', 'wb') as f:
-        pickle.dump(wt_nn_dict, f)
-    with open('data/vis_r_dict.pickle', 'wb') as f:
-        pickle.dump(vis_r_dict, f)    
-
+    with open('data/vism_nn_dict.json', 'w') as f:
+        json.dump(vism_nn_dict, f)
+    with open('data/jac_nn_dict.json', 'w') as f:
+        json.dump(jac_nn_dict, f)
+    with open('data/wt_nn_dict.json', 'w') as f:
+        json.dump(wt_nn_dict, f)
+    with open('data/vis_r_dict.json', 'w') as f:
+        json.dump(vis_r_dict, f) 
 
     plt.savefig('validants.png',overwrite=True)
     plt.show()
@@ -671,8 +450,8 @@ if __name__ == "__main__":
 #    tir_all = pickle.load(f)
 #with open('data/l_Ir_conv_dict_all.pickle', 'rb') as f:
 #    lir_all = pickle.load(f)
-with open('data/vis_r_dict.pickle','rb') as f:
-    vis_all=pickle.load(f)
+with open('data/vis_r_dict.json','r') as f:
+    vis_all=json.load(f)
 
 #tir_cln,lir_cln=
 
