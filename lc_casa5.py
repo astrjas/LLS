@@ -9,10 +9,18 @@ sys.path.insert(0, path_to_gfunc)
 import gfunc_c5 as gf
 from scipy.linalg import lstsq
 import numpy.ma as ma
+from math import e
+import pickle
+import math
 
 
 attn=0
-tavg='240s'
+tavg='60s'
+tavgint=60.
+MJDdate=58232.00000000*3600.*24. #apr242018
+#MJDdate=57850.00000000 #apr072017
+nspw=4
+
 
 #try:
 #    import uvmultimodel
@@ -24,46 +32,104 @@ sys.path.insert(0,"/home/jasminwash/.local/lib/python2.7/site-packages/NordicARC
 
 from NordicARC import uvmultifit as uvm
 
-def antfunc(dfile,it,pol,date):
-    itstr=str(it)
-    ms.open(dfile,nomodify=True)
-    visdata = ms.getdata(['antenna1','antenna2','flag','data','data_desc_id','sigma','axis_info'],ifraxis=True)
-    visdata['data'] = np.squeeze(visdata['data'])
-    ms.close()
+def siggobble(msfile,tavgflt):
+    #print('31: flag phasing scans')
+    tb.open(msfile)
+    scans = tb.getcol('SCAN_NUMBER')
+    #field = tb.getcol('FIELD_ID')
+    ints=tb.getcol('INTERVAL')
+    siggy = tb.getcol('SIGMA')[0]
+    tbData = tb.getcol('DATA')[0]
+    tb.close()
+    #cdn = field == fieldID # here 1 is the field ID of the science source
+    targetScans = np.sort(np.unique(scans))
+    #targetScansIdx = np.insert(np.diff(targetScans),0,1)
+    #cdn = ((abs(tbData)/siggy)<3)[0]|(ints<35.)
+    cdn = ints<tavgflt/2.
+    #badScans=[]
+    badScans=scans[cdn]
+    #badScans = np.sort( np.append(targetScans[cdn], targetScans[cdn]+1) ) # the second array inside append is to select second scan from agroup
+    #for t in range(len(targetScansIdx)):
+    #    if t+1==len(targetScansIdx):
+    #        badScans.append(targetScans[t])
+    #        continue
+    #    if targetScansIdx[t]>3 or (targetScansIdx[t-1]<3 and targetScansIdx[t+1]>3):
+    #        badScans.append(targetScans[t])
+    badscan  = str([b for b in targetScans if b in badScans])
+    badscan  = badscan.strip('[]')
+    flagdata(vis=msfile,
+             mode = 'manual',
+             scan = badscan,
+             flagbackup = True)
 
-    allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
+def antfunc(dfile,it,pol,date,case):
+    itstr=str(it)
+
+    #with open('data/'+case+'Data.pickle', 'rb') as f:
+    #    visdata = pickle.load(f)
+    tb.open(dfile)
+    tbData1=tb.getcol('DATA')
+    tbData=np.squeeze(tbData1)
+    tbFlag1=tb.getcol('FLAG')
+    tbFlag=np.squeeze(tbFlag1)
+    tbt=tb.getcol('TIME')
+    tba1=tb.getcol('ANTENNA1')
+    tba2=tb.getcol('ANTENNA2')
+    tbsig=tb.getcol('SIGMA')
+    tb.close()
+
+    #ms.open(dfile,nomodify=True)
+    #visdata = ms.getdata(['antenna1','antenna2','flag','data','data_desc_id','sigma','axis_info'],ifraxis=True)
+    #visdata['data'] = np.squeeze(visdata['data'])
+    #ms.close()
+
+    #allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
+    allants=np.concatenate((tba1,tba2))
     antlist=np.unique(allants)
 
-    npol=visdata['data'].shape[0]
-    polnames=visdata['axis_info']['corr_axis']
+    #npol=visdata['data'].shape[0]
+    npol=tbData.shape[0]
+    #polnames=visdata['axis_info']['corr_axis']
+    polnames=['XX','YY']
     corr=polnames[pol]
     nant=len(antlist)
     nbl=int(nant*(nant-1)/2)
-    ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
+    #ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
+    ntimes=len(tbt)
 
-    tt=np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)
+    #tt=(np.array(visdata['axis_info']['time_axis']['MJDseconds']-MJDdate,dtype=float)-MJDdate)/3600.
+    tt=(np.array(tbt-MJDdate,dtype=float))/3600.
 
     #Creating a tf dictionary for each ant and whether time is good or bad there
     antinfo=dict()
-    antinfo['timestamp']=visdata['axis_info']['time_axis']['MJDseconds']
+    #antinfo['timestamp']=visdata['axis_info']['time_axis']['MJDseconds']
+    antinfo['timestamp']=tbt
 
     allant=np.zeros((nant,ntimes),dtype=bool)
     alltim=np.zeros((ntimes,nant),dtype=bool)
 
-    xx=np.zeros_like(visdata['flag'][pol])
-    flagpt=(visdata['flag'][pol]==True)
-    xx=np.squeeze(np.where(flagpt==True,np.nan,visdata['data'][pol]))
+    #xx=np.zeros_like(visdata['flag'][pol])
+    xx=np.zeros_like(tbData[pol])
+    xxsig=np.zeros_like(tbsig[pol])
+    #flagpt=((visdata['flag'][pol]==True)|(visdata['data'][pol]==0))
+    flagpt=((tbFlag[pol]==True)|(tbData[pol]==0))
+    #flagpt1=(visdata['data'][pol]==0)
+    #xx0=np.squeeze(np.where(flagpt==True,np.nan,visdata['data'][pol]))
+    #xx=np.squeeze(np.where(flagpt==True,np.nan,visdata['data'][pol]))
+    xx=np.squeeze(np.where(flagpt==True,np.nan,tbData[pol]))
+    xxsig=np.squeeze(np.where(flagpt==True,np.nan,tbsig[pol]))
     print("xxshape",xx.shape)
 
-    for y in range(nbl):
-        pp1=np.array(xx[y])
-        #plt.scatter(tt,pp)
-        plt.scatter(tt,np.abs(pp1))
+    #for y in range(nbl):
+    #    pp1=np.array(xx[y])
+    #    plt.scatter(tt,pp)
+    plt.scatter(tt,np.abs(xx))
     plt.show()
+    #plt.xlim(left=2.5,right=13.5)
     #plt.savefig('datatestplot_'+auth+refmeth+'_'+date+corr+str(it)+'.png',overwrite=True)
     plt.savefig('datatestplot_'+str(dfile[:-3])+'_'+str(it)+date+'1.png',overwrite=True)
     plt.clf()
-
+    '''
     #tf matrix for where amp of ant is bad (True)
     tfdata=np.isnan(np.log10(np.abs(xx)))
     #np.log10(np.abs(xx))
@@ -74,7 +140,8 @@ def antfunc(dfile,it,pol,date):
     for a in range(nant):
         ant=antlist[a]
         #all baselines w/ this ant
-        thisant=(visdata['antenna1']==ant) | (visdata['antenna2']==ant)
+        #visdata['antenna1']
+        thisant=(tba1==ant) | (tba2==ant)
         #pull all baselines for this ant at all times w/in tfdata
         allt1ant=tfdata[thisant][:]
         #evaluating if baseline/antenna is bad at each time
@@ -94,7 +161,8 @@ def antfunc(dfile,it,pol,date):
     for i in range(ntimes):
         j=0
         tfstore=np.zeros(len(antlist),dtype=bool)
-        ct=visdata['axis_info']['time_axis']['MJDseconds'][i]
+        #ct=visdata['axis_info']['time_axis']['MJDseconds'][i]
+        ct=tbt[i]
         #print("tstamp",ct)
         for ant in range(nant):
             tfstore[j]=allant[ant][i]
@@ -103,10 +171,16 @@ def antfunc(dfile,it,pol,date):
 
 
     antinfo['goodt_'+corr+itstr]=alltim
-    return antinfo,xx
+    '''
+    #return antinfo,xx
+    return xx,xxsig
+
+
 
 ####################################################################
-def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
+def gsolve(nbl,nant,vdata,varr,varrcln,antlist,corr,itstr,refant,case,tba1,tba2,tbt,tbspw,sigarr,sigarrcln):#ainfo
+    #gst0=time.time()
+    plt.clf()
     theta_r_dict={}
     theta_m_dict={}
     theta_Ir_dict={}
@@ -114,8 +188,10 @@ def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
     theta_rms_dict={}
 
     script_L_dict={}
+    script_L_nn_dict={}
     theta_r_nn_dict={}
     l_m_dict={}
+    l_m_nn_dict={}
     theta_m_nn_dict={}
     l_r_dict={}
     l_del_dict={}
@@ -128,227 +204,376 @@ def gsolve(nbl,nant,vdata,varr,ainfo,antlist,corr,itstr,refant):
 
     rfantind=np.where(antlist==refant)[0][0]
 
-    print("Finding bad antennas and phase and amp for each baseline...")
-    for j in range(len(ainfo['timestamp'])):
-        #Jacobian and measured phase matrix
-        Theta_r=np.zeros((nbl,nant-1),dtype=int)
-        theta_m=np.zeros((nbl,1),dtype=float)
+    
 
-        #Defining Jacobian and measured amp matrix
-        script_L=np.zeros((nbl,nant),dtype=int)
-        l_m=np.zeros((nbl,1),dtype=float)
-        astore=np.zeros((nbl,1),dtype=float)
-        bantstore=[]
+    untime=np.unique(tbt)
+    for s in range(nspw):
+        spwstr=str(s)
+        print(spwstr)
+        #for j in range(len(ainfo['timestamp'])):
+        for j in range(len(untime)):
+            allt=(tbt==untime[j])
+            #dTime=vdata[pol][allt]
+            a1Time=tba1[allt]
+            a2Time=tba2[allt]
+            aAllTime=np.concatenate((a1Time,a2Time))
+            #print(aAllTime)
+            exclAnts1=np.array(list(set(antlist)-set(aAllTime)))
+            #print(exclAnts1)
+            goodAnts=np.sort(np.array(list(set(antlist)-set(exclAnts1))))
+            #print(goodAnts)
+            extraAnts=gf.bl_checker(goodAnts,varr,tba1,tba2,tbt,tbspw,untime[j],s)
+            #may need to add here
+            #print(extraAnts)
+            exclAnts=np.unique(np.concatenate((exclAnts1,extraAnts))).astype(int)
+            #print(exclAnts)
+            #print(len(exclAnts))
+            #pdb.set_trace()
+            #nant=len(np.unique(aAllTime))
+            #nbl=(nant*(nant-1))/2
 
+            #Jacobian and measured phase matrix
+            Theta_r=np.zeros((nbl,nant-1),dtype=int)
+            bad_T=np.zeros((nbl,nant-1),dtype=int)
+            theta_m=np.zeros((nbl,1),dtype=float)
 
-        #print(time)
-        thistime=(vdata['axis_info']['time_axis']['MJDseconds']==ainfo['timestamp'][j])
-        time=str(j)
-
-        #Calculating number of antennas and baselines
-        #-1 is to account for bad ants (ant1=-1 is not valid)    
-        nb=0
-        #print("Finding bad antennas and phase and amp for each baseline...")
-        for ant1 in np.unique(vdata['antenna1']):
-            for ant2 in np.unique(vdata['antenna2']):
-                if ant1 < ant2:
-                    thisbase = (vdata['antenna1']==ant1) & (vdata['antenna2']==ant2)
-                    iant1=np.where(antlist==ant1)[0][0]
-                    #print(iant1)
-                    iant2=np.where(antlist==ant2)[0][0]
-                    #print(iant2)
-                    if thisbase.sum()>0:
-                        #potential 0 after thisbase and thistime
-                        pt=varr[thisbase][0][j]
-                        #print("PT",pt)
-                        ph=np.angle(pt,deg=True)
-                        amp=np.absolute(pt)
-                        #plt.scatter(j,ph)
-                        if np.isnan(amp)==True: 
-                            bantstore.append(iant1)
-                            #bantstore.append(iant2)
-                        #print("AMP",amp)
-
-                        #if iant1==5 or iant2==5:
-                            #amp*=4
-                            #ph+=90
-                            #print("bing")
-
-                        l_m[nb,0]=np.log10(amp)
-                        astore[nb,0]=amp
-
-                        script_L[nb,iant1]=1
-                        script_L[nb,iant2]=1
+            #Defining Jacobian and measured amp matrix
+            script_L=np.zeros((nbl,nant),dtype=int)
+            bad_L=np.zeros((nbl,nant),dtype=int)
+            l_m=np.zeros((nbl,1),dtype=float)
+            astore=np.zeros((nbl,1),dtype=float)
+            bantstore=[]
+            blstore=[]
 
 
-                        #PHASE STUFF
-                        theta_m[nb,0]=ph
+            #print(time)
+            #thistime=(vdata['axis_info']['time_axis']['MJDseconds']==ainfo['timestamp'][j])
+            time=str(j)
 
-                        if ant1==refant: Theta_r[nb,iant2-1]=-1
-                        if ant2==refant: Theta_r[nb,iant1]=1
-                        if ant1!=refant and ant1>refant:
-                            Theta_r[nb,iant1-1]=1
-                            Theta_r[nb,iant2-1]=-1
-                        if ant1!=refant and ant2<refant:
-                            Theta_r[nb,iant1]=1
-                            Theta_r[nb,iant2]=-1
-                        if (ant1!=refant and (ant2>refant and ant1<refant)):
-                            Theta_r[nb,iant1]=1
-                            Theta_r[nb,iant2-1]=-1
-                        nb+=1
-        #plt.show()
-        #plt.savefig('raw_ph_'+str(dfile[:-3])+'.png',overwrite=True)
-        #plt.clf()
-        badance=np.full((nant,1),False,dtype=bool)
-        for ia in range(nant):
-            #print(bantstore.count(ia))
-            #if ia==38: 
-            #    if bantstore.count(ia)>0: badance[ia,0]=True
-            #else:
-            if bantstore.count(ia)==38-ia: badance[ia,0]=True
-        #badance=np.unique(bantstore)
-        #print(badance)
-        plt.scatter(j,len(np.where(badance==True)[0]))
-        gf.dict_update(all_bdance,time+corr+itstr,badance)
+            #Calculating number of antennas and baselines
+            #-1 is to account for bad ants (ant1=-1 is not valid)    
+            nb=0
+            #for ant1 in np.unique(vdata['antenna1']):
+            for ant1 in np.unique(tba1):
+                for ant2 in np.unique(tba2):
+                #for ant2 in np.unique(vdata['antenna2']):
+                    if ant1 < ant2:
+                        #thisbase = (vdata['antenna1']==ant1) & (vdata['antenna2']==ant2)
+                        thispt= (tba1==ant1) & (tba2==ant2) & (tbt==untime[j]) & (tbspw==s)
+                        iant1=np.where(antlist==ant1)[0][0]
+                        #print(iant1)
+                        iant2=np.where(antlist==ant2)[0][0]
+                        #print(iant2)
+                        if thispt.sum()==0 or ant1 in exclAnts or ant2 in exclAnts:
+                            l_m[nb,0]=np.nan
+                            astore[nb,0]=np.nan
 
-        gf.dict_update(theta_r_dict,time+corr+itstr,Theta_r)
-        gf.dict_update(theta_m_dict,time+corr+itstr,theta_m)
+                            script_L[nb,iant1]=1#1
+                            script_L[nb,iant2]=1#1
 
 
-        gf.dict_update(script_L_dict,time+corr+itstr,script_L)
-        gf.dict_update(l_m_dict,time+corr+itstr,l_m)
-        
+                            #PHASE STUFF
+                            theta_m[nb,0]=np.nan
 
-        #scl.write("\n\n")
+                            if ant1==refant: Theta_r[nb,iant2-1]=-1#-1
+                            if ant2==refant: Theta_r[nb,iant1]=1#1
+                            if ant1!=refant and ant1>refant:
+                                Theta_r[nb,iant1-1]=1#1
+                                Theta_r[nb,iant2-1]=-1#-1
+                            if ant1!=refant and ant2<refant:
+                                Theta_r[nb,iant1]=1#1
+                                Theta_r[nb,iant2]=-1#-1
+                            if (ant1!=refant and (ant2>refant and ant1<refant)):
+                                Theta_r[nb,iant1]=1#1
+                                Theta_r[nb,iant2-1]=-1
+                            nb+=1
+                            continue
+                        if thispt.sum()>0:
+                            #potential 0 after thisbase and thistime
+                            #pt=varr[thisbase][0][j]
+                            pt=varr[thispt][0]
+                            ptc=varrcln[thispt][0]
+                            #print("PT",pt)
+                            #print("PTC",ptc)
+                            #pdb.set_trace()
+                            ph=np.angle(pt,deg=False)
+                            phc=np.angle(ptc,deg=False)
+                            amp=abs(pt)
+                            ampc=abs(ptc)
+                            if ampc/sigarrcln[thispt][0]<5:
+                                l_m[nb,0]=np.nan
+                                astore[nb,0]=np.nan
 
-        #lme.write("\n\n")
-
-        #ast.write(str(astore))
-        #ast.write("\n\n")
-
-
-        script_L_nn=gf.nonan(script_L)
-        #gf.dict_update(script_L_nn_dict,time+corr+itstr,script_L_nn)
-        #scl.write(str(script_L_nn))
-        l_m_nn=gf.nonan(l_m)
-        #gf.dict_update(l_m_nn_dict,time+corr+itstr,l_m_nn)
-        #lme.write(str(l_m_nn))
-
-        #l_r=gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn)
-        #print(len(np.where(l_m_nn.mask==False)[0]))
-        #print(j)
-        l_r=gf.l_Ir_mask(ll_r=script_L_nn,ll_m=l_m_nn,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,bdance=badance)
-
-
-        Theta_r_nn=gf.nonan(Theta_r)
-        gf.dict_update(theta_r_nn_dict,time+corr+itstr,Theta_r_nn)
-        theta_m_nn=gf.nonan(theta_m)
-        gf.dict_update(theta_m_nn_dict,time+corr+itstr,theta_m_nn)
-
-        theta_Ir=gf.th_Ir_mask(Th_r=Theta_r_nn,th_m=theta_m_nn,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,rfantind=rfantind,bdance=badance)
-        #theta_Ir=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_m_nn)
-
-
-
-        #Residuals
-        l_del=l_m_nn-np.matmul(script_L_nn,l_r)
-        #print("l_del \n"+str(l_del))
-        gf.dict_update(l_del_dict,time+corr+itstr,l_del)
-        #print(l_del.shape)
-
-        l_Ir_res=gf.l_Ir_mask(ll_r=script_L_nn,ll_m=l_del,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,bdance=badance)
-
-        #print("l_Ir w/ resids: \n"+str(l_Ir_res))
-
-        theta_del=theta_m_nn-np.matmul(Theta_r_nn,theta_Ir)
-        #print("theta_del \n"+str(theta_del))
-        gf.dict_update(theta_del_dict,time+corr+itstr,theta_del)
-
-        theta_Ir_res=gf.th_Ir_mask(Th_r=Theta_r_nn,th_m=theta_del,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,rfantind=rfantind,bdance=badance)
-        #theta_Ir_res=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_del)
-        #theta_Ir_res,restd,rnktd,stdel=lstsq(a=Theta_r_nn,b=theta_del)
-        #print("theta_Ir w/ resids: \n"+str(theta_Ir_res))
+                                script_L[nb,iant1]=1#1
+                                script_L[nb,iant2]=1#1
 
 
-        l_Ir_final=l_r+l_Ir_res
-        #ast.write(str(l_Ir_final))
-        #l_Ir_final=l_r
-        #print("l_ir_shape")
-        #print(l_Ir_final.shape)
-        gf.dict_update(l_r_dict,time+corr+itstr,l_Ir_final)
-        #print("final amps (log form) \n"+str(l_Ir_final))
+                                #PHASE STUFF
+                                theta_m[nb,0]=np.nan
 
-        Ir_converted=np.zeros_like(l_Ir_final)
+                                if ant1==refant: Theta_r[nb,iant2-1]=-1#-1
+                                if ant2==refant: Theta_r[nb,iant1]=1#1
+                                if ant1!=refant and ant1>refant:
+                                    Theta_r[nb,iant1-1]=1#1
+                                    Theta_r[nb,iant2-1]=-1#-1
+                                if ant1!=refant and ant2<refant:
+                                    Theta_r[nb,iant1]=1#1
+                                    Theta_r[nb,iant2]=-1#-1
+                                if (ant1!=refant and (ant2>refant and ant1<refant)):
+                                    Theta_r[nb,iant1]=1#1
+                                    Theta_r[nb,iant2-1]=-1
+                                nb+=1
+                            else:
+                            #pdb.set_trace()
+                            #if np.isnan(amp)==True: 
+                            #    bantstore.append(iant1)
+                            #    blstore.append(nb)
+                            #    #bantstore.append(iant2)
+                            #    bad_L[nb,iant1]=2
+                            #    bad_L[nb,iant2]=2
 
-        #Ir_converted=np.vstack([10.0**x for x in l_Ir_final])
-        for x in range(l_Ir_final.shape[0]):
-            lir=l_Ir_final[x,0]
-            Ir_converted[x,0]=10.0**lir
-            
-        #print("l_conv shape")
-        #print(Ir_converted.shape)
+                            #    if ant1==refant: bad_T[nb,iant2-1]=2
+                            #    if ant2==refant: bad_T[nb,iant1]=2
+                            #    if ant1!=refant and ant1>refant:
+                            #        bad_T[nb,iant1-1]=2
+                            #        bad_T[nb,iant2-1]=2
+                            #    if ant1!=refant and ant2<refant:
+                            #        bad_T[nb,iant1]=2
+                            #        bad_T[nb,iant2]=2
+                            #    if (ant1!=refant and (ant2>refant and ant1<refant)):
+                            #        bad_T[nb,iant1]=2
+                            #        bad_T[nb,iant2-1]=2
+                            #print("AMP",amp)
 
-        gf.dict_update(l_Ir_conv_dict,time+corr+itstr,Ir_converted)
+                            #if iant1==5 or iant2==5:
+                                #amp*=4
+                                #ph+=90
+                                #print("bing")
 
-        theta_Ir_final=theta_Ir+theta_Ir_res
-        gf.dict_update(theta_Ir_dict,time+corr+itstr,theta_Ir_final)
-    #plt.show()
+                                l_m[nb,0]=np.log10(amp/ampc)
+                                astore[nb,0]=amp
+
+                                script_L[nb,iant1]=1
+                                script_L[nb,iant2]=1
+
+
+                                #PHASE STUFF
+                                theta_m[nb,0]=ph-phc
+
+                                if ant1==refant: Theta_r[nb,iant2-1]=-1
+                                if ant2==refant: Theta_r[nb,iant1]=1
+                                if ant1!=refant and ant1>refant:
+                                    Theta_r[nb,iant1-1]=1
+                                    Theta_r[nb,iant2-1]=-1
+                                if ant1!=refant and ant2<refant:
+                                    Theta_r[nb,iant1]=1
+                                    Theta_r[nb,iant2]=-1
+                                if (ant1!=refant and (ant2>refant and ant1<refant)):
+                                    Theta_r[nb,iant1]=1
+                                    Theta_r[nb,iant2-1]=-1
+                                nb+=1
+            #print(j)
+            badance=np.full((nant,1),False,dtype=bool)
+            badbl=np.full((nbl,1),False,dtype=bool)
+            for ia in range(nant):
+                #print(bantstore.count(ia))
+                #if ia==38: 
+                #    if bantstore.count(ia)>0: badance[ia,0]=True
+                #else:
+                #if bantstore.count(ia)==nant-1: badance[ia,0]=True
+                #if ia in bantstore: badance[ia,0]=True
+                if bantstore.count(ia)==(nant-1)-ia: 
+                    badance[ia,0]=True
+                #else: print("bonk!")
+            for ib in range(nbl):
+                if ib in blstore: badbl[ib,0]=True
+            #print(len(blstore))
+            #pdb.set_trace()    
+            #badance=np.unique(bantstore)
+            #print(badance)
+            plt.scatter(j,len(np.where(badance==True)[0]))
+            gf.dict_update(all_bdance,time+corr+itstr+spwstr,badance)
+
+
+            gf.dict_update(theta_r_dict,time+corr+itstr+spwstr,Theta_r)
+            gf.dict_update(theta_m_dict,time+corr+itstr+spwstr,theta_m)
+
+
+            #scl.write("\n\n")
+
+            #lme.write("\n\n")
+
+            #ast.write(str(astore))
+            #ast.write("\n\n")
+            #help me mark I hope
+            #pdb.set_trace()
+
+            script_L_nn=gf.nonan(script_L)
+            gf.dict_update(script_L_dict,time+corr+itstr+spwstr,script_L)
+            #scl.write(str(script_L_nn))
+            l_m_nn=gf.nonan(l_m)
+            gf.dict_update(l_m_dict,time+corr+itstr+spwstr,l_m)
+            #lme.write(str(l_m_nn))
+
+            gf.dict_update(script_L_nn_dict,time+corr+itstr+spwstr,script_L_nn)
+            gf.dict_update(l_m_nn_dict,time+corr+itstr+spwstr,l_m_nn)
+
+
+            #l_r=gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn)
+            #print("wherelmnnfalse",len(np.where(l_m_nn.mask==False)[0]))
+            #print("j",j)
+            l_r=gf.l_Ir_mask(ll_r=script_L_nn,ll_m=l_m_nn,nant=nant,bbl=badbl,antlist=antlist,exclAnts=exclAnts)
+            #l_r=gf.l_Ir_nan(ll_r=script_L,ll_m=l_m,ainfo=ainfo,t=j,nant=nant,corr=corr,itstr=itstr,bdance=badance,bbl=badbl)
+
+
+            Theta_r_nn=gf.nonan(Theta_r)
+            gf.dict_update(theta_r_nn_dict,time+corr+itstr+spwstr,Theta_r_nn)
+            theta_m_nn=gf.nonan(theta_m)
+            gf.dict_update(theta_m_nn_dict,time+corr+itstr+spwstr,theta_m_nn)
+
+
+            theta_Ir=gf.th_Ir_mask(Th_r=Theta_r_nn,th_m=theta_m_nn,rfantind=rfantind,nant=nant,bbl=badbl,antlist=antlist,exclAnts=exclAnts)
+            #theta_Ir=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_m_nn)
+
+
+
+            #Residuals
+            l_del=l_m_nn-np.matmul(script_L_nn,l_r)
+            #print("l_del \n"+str(l_del))
+            gf.dict_update(l_del_dict,time+corr+itstr+spwstr,l_del)
+
+            #print(l_del.shape)
+
+            #l_Ir_res=gf.l_Ir_mask(ll_r=script_L_nn,ll_m=l_del,nant=nant,bbl=badbl,antlist=antlist,exclAnts=exclAnts)
+
+            #print("l_Ir w/ resids: \n"+str(l_Ir_res))
+
+            theta_del=theta_m_nn-ma.dot(Theta_r_nn,theta_Ir)
+            #print("theta_del \n"+str(theta_del))
+            gf.dict_update(theta_del_dict,time+corr+itstr+spwstr,theta_del)
+
+            #theta_Ir_res=gf.th_Ir_mask(Th_r=Theta_r_nn,th_m=theta_del,rfantind=rfantind,nant=nant,bbl=badbl,antlist=antlist,exclAnts=exclAnts)
+            #theta_Ir_res=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_del)
+            #theta_Ir_res,restd,rnktd,stdel=lstsq(a=Theta_r_nn,b=theta_del)
+            #print("theta_Ir w/ resids: \n"+str(theta_Ir_res))
+
+
+            #l_Ir_final=l_r+l_Ir_res
+            #ast.write(str(l_Ir_final))
+            l_Ir_final=l_r
+            #print("l_ir_shape")
+            #print(l_Ir_final.shape)
+            gf.dict_update(l_r_dict,time+corr+itstr+spwstr,l_Ir_final)
+            #print("final amps (log form) \n"+str(l_Ir_final))
+
+            #with open('data/model_redshifts.pickle', 'rb') as f:
+            #    redshifts = pickle.load(f)
+
+            Ir_converted=np.zeros_like(l_Ir_final)
+
+            #Ir_converted=np.vstack([10.0**x for x in l_Ir_final])
+            for x in range(l_Ir_final.shape[0]):
+                lir=l_Ir_final[x,0]
+                Ir_converted[x,0]=10.0**lir
+
+            #print("l_conv shape")
+            #print(Ir_converted.shape)
+
+            gf.dict_update(l_Ir_conv_dict,time+corr+itstr+spwstr,Ir_converted)
+
+            #theta_Ir_final=theta_Ir+theta_Ir_res
+            theta_Ir_final=theta_Ir
+            gf.dict_update(theta_Ir_dict,time+corr+itstr+spwstr,theta_Ir_final)
+
+
+          #plt.show()
+    with open('data/all_bdance_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(all_bdance, f)
+    with open('data/theta_Ir_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(theta_Ir_dict, f)
+    with open('data/l_Ir_conv_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(l_Ir_conv_dict, f)
+    with open('data/l_r_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(l_r_dict, f)
+    with open('data/theta_del_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(theta_del_dict, f)
+    with open('data/theta_r_nn_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(theta_r_nn_dict, f)
+    with open('data/theta_m_nn_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(theta_m_nn_dict, f)
+    with open('data/l_del_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(l_del_dict, f)
+    with open('data/theta_r_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(theta_r_dict, f)
+    with open('data/theta_m_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(theta_m_dict, f)
+    with open('data/script_L_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(script_L_dict, f)
+    with open('data/l_m_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(l_m_dict, f)
+    with open('data/script_L_nn_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(script_L_nn_dict, f)
+    with open('data/l_m_nn_dict_'+case+'.pickle', 'wb') as f:
+        pickle.dump(l_m_nn_dict, f)
+
+
     plt.savefig('validants.png',overwrite=True)
     plt.show()
     plt.clf()
-    return theta_Ir_dict, l_Ir_conv_dict
+    #gst1=time.time()
+    #print("Time to run is",(gst1-gst0)/60,"minutes",(gst1-gst0)/3600,"hours")
+    return 0
+
 
 
 ####################################################################
 
 def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     itstr=str(it)
+    nspw=4
+
+    antinfo={}
 
     print(datams1)
+    tb.open(datams1)
+    tbData1=tb.getcol('DATA')
+    tbData=np.squeeze(tbData1)
+    tbFlag1=tb.getcol('FLAG')
+    tbFlag=np.squeeze(tbFlag1)
+    tbt=tb.getcol('TIME')
+    tba1=tb.getcol('ANTENNA1')
+    tba2=tb.getcol('ANTENNA2')
+    tbspw=tb.getcol('DATA_DESC_ID')
+    tb.close()
 
-    #Opening data and pulling necessary info
-    ms.open(datams1,nomodify=True)
-    ms.selectinit(reset=True)
-    visdata = ms.getdata(['antenna1','antenna2','data','axis_info','flag'],ifraxis=True)
-    #printing correlations
-    print(visdata['axis_info']['corr_axis'])
+    utbt=np.unique(tbt)
 
-    #Squeeze data then close ms
-
-    visdata['data'] = np.squeeze(visdata['data'])
-    print("data shape",visdata['data'].shape)
-    ms.close()
-
-    ms.open(datams_cm,nomodify=True)
-    ms.selectinit(reset=True)
-    visdata_cm = ms.getdata(['antenna1','antenna2','data','axis_info','flag'],ifraxis=True)
-    #printing correlations
-    print(visdata_cm['axis_info']['corr_axis'])
-
-    #Squeeze data then close ms
-
-    visdata_cm['data'] = np.squeeze(visdata_cm['data'])
-    print("data_cm shape",visdata_cm['data'].shape)
-    ms.close()    
-
-    allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
+    allants=np.concatenate((tba1,tba2))
     antlist=np.unique(allants)
 
-    npol=visdata['data'].shape[0]
-    polnames=visdata['axis_info']['corr_axis']
+    npol=tbData.shape[0]
+    #polnames=visdata['axis_info']['corr_axis']
+    polnames=['XX','YY']
     corr=polnames[pol]
     nant=len(antlist)
     nbl=int(nant*(nant-1)/2)
-    ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
+    #ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
+    ntimes=len(tbt)
+
+
+    #pdb.set_trace()
 
     #Pulling all unique timestamps, print its length and then all times
-    ELO=np.unique(visdata['axis_info']['time_axis']['MJDseconds'])
+    #ELO=np.unique(visdata['axis_info']['time_axis']['MJDseconds'])
+    ELO=np.unique(tbt)
     print(len(ELO))
-    print(len(visdata['axis_info']['time_axis']['MJDseconds']))
+    #print(len(visdata['axis_info']['time_axis']['MJDseconds']))
     #print([x-ELO[0] for x in ELO])
 
-    antinfo,xx=antfunc(dfile=datams1,it=it,pol=pol,date=date)
-    antinfo_clean,xx_clean=antfunc(dfile=datams_cm,it=it,pol=pol,date=date)
+    #antinfo,
+    xx,xxsig=antfunc(dfile=datams1,it=it,pol=pol,date=date,case='ext')
+    #antinfo_clean,
+    xx_clean,xxsig_clean=antfunc(dfile=datams_cm,it=it,pol=pol,date=date,case='cln')
     print("XX",xx.shape)
 
 
@@ -361,202 +586,62 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     nvis=[]
 
     #Cycling through all the times
-    for time in antinfo['goodt_'+corr+itstr]:
-        if np.any(time)==False: allgoodtime+=1
-        if np.any(time)==True:
-            nbad=np.count_nonzero(time)
-            if nbad==nant: allbad+=1
-            if nbad<nant: good1+=1
+    #for time in antinfo['goodt_'+corr+itstr+spwstr]:
+    #    if np.any(time)==False: allgoodtime+=1
+    #    if np.any(time)==True:
+    #        nbad=np.count_nonzero(time)
+    #        if nbad==nant: allbad+=1
+    #        if nbad<nant: good1+=1
 
-    print("All good antennas:",allgoodtime)
-    print("Almost all good antennas:",good1)
-    print("All ants bad:",allbad)
+    #print("All good antennas:",allgoodtime)
+    #print("Almost all good antennas:",good1)
+    #print("All ants bad:",allbad)
 
-    #refant=gf.refantfinder(antlist=antlist,goodant=antinfo['goodant_'+corr+itstr])
+    #refant=gf.refantfinder(tba1=tba1,tba2=tba2,tbt=tbt,tbspw=tbspw,untime=utbt,nspw=nspw,nant=nant,antlist=antlist)
     #iref=np.where(antlist==refant)[0]
     refant=rfant
     iref=np.where(antlist==refant)[0]
+    #pdb.set_trace()
 
     #scl=open("scriptL_"+target+date+corr+itstr+".txt","w")
     #lme=open("lm_"+target+date+corr+itstr+".txt","w")
     #ast=open("astore_"+target+date+corr+itstr+".txt","w")
 
-    print("Solving for gains...")
-    tir_ext,lir_ext=gsolve(nbl=nbl,nant=nant,vdata=visdata,varr=xx,ainfo=antinfo,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
-    tir_cln,lir_cln=gsolve(nbl=nbl,nant=nant,vdata=visdata_cm,varr=xx_clean,ainfo=antinfo_clean,antlist=antlist,corr=corr,itstr=itstr,refant=refant)
+    #tir_ext,lir_ext=
+    #gsolve(nbl=nbl,nant=nant,vdata=visdata,varr=xx,ainfo=antinfo,antlist=antlist,corr=corr,itstr=itstr,refant=refant,case='ext')
 
-
-
-    '''
-    #def gsolve(nbl,nant,vdict,varr,
-    theta_r_dict={}
-    theta_m_dict={}
-    theta_Ir_dict={}
-    theta_del_dict={}
-    theta_rms_dict={}
-
-    script_L_dict={}
-    l_m_dict={}
-    l_r_dict={}
-    l_del_dict={}
-    l_rms_dict={}
-    l_Ir_conv_dict={}
-
-    smc=0
-
-    for i in range(len(antinfo['timestamp'])):
-        #Jacobian and measured phase matrix
-        Theta_r=np.zeros((nbl,nant-1),dtype=int)
-        theta_m=np.zeros((nbl,1),dtype=float)
-
-        #Defining Jacobian and measured amp matrix
-        script_L=np.zeros((nbl,nant),dtype=int)
-        l_m=np.zeros((nbl,1),dtype=float)
-        astore=np.zeros((nbl,1),dtype=float)
-
-
-        #print(time)
-        thistime=(visdata['axis_info']['time_axis']['MJDseconds']==antinfo['timestamp'][i])
-        time=str(i)
-
-        #Calculating number of antennas and baselines
-        #-1 is to account for bad ants (ant1=-1 is not valid)    
-        nb=0
-        for ant1 in np.unique(visdata['antenna1']):
-            for ant2 in np.unique(visdata['antenna2']):
-                if ant1 < ant2:
-                    thisbase = (visdata['antenna1']==ant1) & (visdata['antenna2']==ant2)
-                    iant1=np.where(antlist==ant1)[0][0]
-                    #print(iant1)
-                    iant2=np.where(antlist==ant2)[0][0]
-                    #print(iant2)
-                    if thisbase.sum()>0:
-                        #potential 0 after thisbase and thistime
-                        pt=xx[thisbase][0][i]
-                        #print("PT",pt)
-                        ph=np.angle(pt,deg=True)
-                        amp=np.absolute(pt)
-                        #print("AMP",amp)
-
-                        #if iant1==5 or iant2==5:
-                            #amp*=4
-                            #ph+=90
-                            #print("bing")
-
-                        l_m[nb,0]=np.log10(amp)
-                        astore[nb,0]=amp
-
-                        script_L[nb,iant1]=1
-                        script_L[nb,iant2]=1
-
-
-                        #PHASE STUFF
-                        theta_m[nb,0]=ph
-
-                        #print(iant1)
-                        #print(iant2)
-
-                        if ant1==refant: Theta_r[nb,iant2-1]=-1
-                        if ant2==refant: Theta_r[nb,iant1]=1
-                        if ant1!=refant and ant1>refant:
-                            Theta_r[nb,iant1-1]=1
-                            Theta_r[nb,iant2-1]=-1
-                        if ant1!=refant and ant2<refant:
-                            Theta_r[nb,iant1]=1
-                            Theta_r[nb,iant2]=-1
-                        if (ant1!=refant and (ant2>refant and ant1<refant)):
-                            Theta_r[nb,iant1]=1
-                            Theta_r[nb,iant2-1]=-1
-                        nb+=1
-
-        gf.dict_update(theta_r_dict,time+corr+itstr,Theta_r)
-        gf.dict_update(theta_m_dict,time+corr+itstr,theta_m)
-
-
-        gf.dict_update(script_L_dict,time+corr+itstr,script_L)
-        gf.dict_update(l_m_dict,time+corr+itstr,l_m)
-
-
-        scl.write("\n\n")
-
-        lme.write("\n\n")
-
-        #ast.write(str(astore))
-        ast.write("\n\n")
-
-
-        script_L_nn=gf.nonan(script_L)
-        scl.write(str(script_L_nn))
-        l_m_nn=gf.nonan(l_m)
-        lme.write(str(l_m_nn))
-
-        l_r=gf.l_Ir(ll_r=script_L_nn,ll_m=l_m_nn)
-
-        Theta_r_nn=gf.nonan(Theta_r)
-        theta_m_nn=gf.nonan(theta_m)
-
-        theta_Ir=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_m_nn)
-
-
-
-        #Residuals
-        l_del=l_m_nn-np.matmul(script_L_nn,l_r)
-        #print("l_del \n"+str(l_del))
-        gf.dict_update(l_del_dict,time+corr+itstr,l_del)
-        #print(l_del.shape)
-
-        l_Ir_res=gf.l_Ir(ll_r=script_L_nn,ll_m=l_del)
-
-        #print("l_Ir w/ resids: \n"+str(l_Ir_res))
-
-        theta_del=theta_m_nn-np.matmul(Theta_r_nn,theta_Ir)
-        #print("theta_del \n"+str(theta_del))
-        gf.dict_update(theta_del_dict,time+corr+itstr,theta_del)
-
-        theta_Ir_res=gf.th_Ir(Th_r=Theta_r_nn,th_m=theta_del)
-        #theta_Ir_res,restd,rnktd,stdel=lstsq(a=Theta_r_nn,b=theta_del)
-        #print("theta_Ir w/ resids: \n"+str(theta_Ir_res))
-
-
-        l_Ir_final=l_r+l_Ir_res
-        ast.write(str(l_Ir_final))
-        #l_Ir_final=l_r
-        #print("l_ir_shape")
-        #print(l_Ir_final.shape)
-        gf.dict_update(l_r_dict,time+corr+itstr,l_Ir_final)
-        #print("final amps (log form) \n"+str(l_Ir_final))
-
-        Ir_converted=np.zeros_like(l_Ir_final)
-
-        #Ir_converted=np.vstack([10.0**x for x in l_Ir_final])
-        for x in range(l_Ir_final.shape[0]):
-            lir=l_Ir_final[x,0]
-            Ir_converted[x,0]=10.0**lir
-
-        #print("l_conv shape")
-        #print(Ir_converted.shape)
-
-        gf.dict_update(l_Ir_conv_dict,time+corr+itstr,Ir_converted)
-
-        theta_Ir_final=theta_Ir+theta_Ir_res
-        gf.dict_update(theta_Ir_dict,time+corr+itstr,theta_Ir_final)
-
-    #return theta_Ir_final, Ir_converted
-    '''
-    #scl.close()
-    #lme.close()
+    gsolve(nbl=nbl,nant=nant,vdata=tbData,varr=xx,varrcln=xx_clean,antlist=antlist,corr=corr,itstr=itstr,refant=refant,case='all',tba1=tba1,tba2=tba2,tbt=tbt,tbspw=tbspw,sigarr=xxsig,sigarrcln=xxsig_clean)#ainfo=antinfo
+    #extargs=(nbl=nbl,nant=nant,vdata=tbData,varr=xx,ainfo=antinfo,antlist=antlist,corr=corr,itstr=itstr,refant=refant,case='ext',tba1=tba1,tba2=tba2,tbt=tbt,tbspw=tbspw),(nbl=nbl,nant=nant,vdata=tbData,varr=xx_clean,ainfo=antinfo_clean,antlist=antlist,corr=corr,itstr=itstr,refant=refant,case='clean',tba1=tba1,tba2=tba2,tbt=tbt,tbspw=tbspw,)
+    #clnargs=(nbl=nbl,nant=nant,vdata=tbData,varr=xx_clean,ainfo=antinfo_clean,antlist=antlist,corr=corr,itstr=itstr,refant=refant,case='clean',tba1=tba1,tba2=tba2,tbt=tbt,tbspw=tbspw,)
+    #dargs=(nbl,nant,tbData,xx,antinfo,antlist,corr,itstr,refant,'ext',tba1,tba2,tbt,tbspw,)
+    #dargs1=(nbl,nant,tbData,xx_clean,antinfo_clean,antlist,corr,itstr,refant,'cln',tba1,tba2,tbt,tbspw,)
 
     '''
-    plt.clf()
-    plt.imshow(script_L)
-    plt.show()
-    plt.savefig('beforemask.png',overwrite=True)
-    plt.clf()
-    plt.imshow(script_L_nn)
-    plt.show()
-    plt.savefig('aftermask.png',overwrite=True)
-    plt.clf()
+    if __name__ == "__main__":
+        p1 = Process(target=gsolve,args=dargs)
+        p1.start()
+        p2 = Process(target=gsolve,args=dargs1)
+        p2.start()
+        p1.join()
+        p2.join()
     '''
+
+    with open('data/theta_Ir_dict_all.pickle', 'rb') as f:
+        tir_all = pickle.load(f)
+    with open('data/l_Ir_conv_dict_all.pickle', 'rb') as f:
+        lir_all = pickle.load(f)
+
+    #tir_cln,lir_cln=
+
+    #gsolve(nbl=nbl,nant=nant,vdata=tbData,varr=xx_clean,ainfo=antinfo_clean,antlist=antlist,corr=corr,itstr=itstr,refant=refant,case='cln',tba1=tba1,tba2=tba2,tbt=tbt,tbspw=tbspw)
+    #clnargs=[]
+    #with open('data/theta_Ir_dict_cln.pickle', 'rb') as f:
+    #    tir_cln = pickle.load(f)
+    #with open('data/l_Ir_conv_dict_cln.pickle', 'rb') as f:
+    #    lir_cln = pickle.load(f)
+
+
+
 
     #print("l_r keys")
     #print(l_r_dict.keys())
@@ -566,18 +651,16 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     #print(l_Ir_conv_dict['3537XX0'].shape)
     #print(l_r_dict['4XX0'].shape)
 
-    ##########BLOCKED TO RID AVG##############
-    '''
-    ELO_diff=np.max(ELO)-np.min(ELO)
-    nint=int(ELO_diff/240)
-    ELO_range=np.linspace(np.min(ELO),np.max(ELO),nint)
-    '''
-    ###########################################
+    #ELO_diff=np.max(ELO)-np.min(ELO)
+    #nint=int(ELO_diff/240)
+    #ELO_range=np.linspace(np.min(ELO),np.max(ELO),nint)
 
     #print("fkeys")
-    fkeys=tir_ext.keys()
-    tkeys=antinfo['timestamp']
+    fkeys=tir_all.keys()
+    #tkeys=antinfo['timestamp']
     #print(fkeys)
+
+    #pdb.set_trace()
 
     nonan=0
     nemp=0
@@ -586,49 +669,88 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     ndp=[]
     nda=[]
 
-    tt=np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)
+    utbt=np.unique(tbt)
+    #tt=(np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)-MJDdate)/3600.
+    tt=(np.array(tbt)-MJDdate)/3600.
 
-    phase_ext1=np.zeros((nant,1,ntimes),dtype=float)
-    amp_ext1=np.zeros((nant,1,ntimes),dtype=float)
 
-    for t_step in range(ntimes):
-        for k in range(nant):
-            amp_ext1[k,0,t_step]=lir_ext[str(t_step)+corr+itstr][k]
-            if k==refant: 
-                phase_ext1[k,0,t_step]=0
-            elif k<refant:
-                phase_ext1[k,0,t_step]=tir_ext[str(t_step)+corr+itstr][k]
-            elif k>refant:
-                phase_ext1[k,0,t_step]=tir_ext[str(t_step)+corr+itstr][k-1]
+    nutimes=len(np.unique(tbt))
 
-    phase_ext=gf.nonan(phase_ext1)
-    amp_ext=gf.nonan(amp_ext1)
 
-    phase_cln1=np.zeros((nant,1,ntimes),dtype=float)
-    amp_cln1=np.zeros((nant,1,ntimes),dtype=float)
+    phase_all1=np.zeros((nant,1,nutimes,nspw),dtype=float)
+    amp_all1=np.zeros((nant,1,nutimes,nspw),dtype=float)
 
-    for t_step in range(ntimes):
-        for k in range(nant):
-            amp_cln1[k,0,t_step]=lir_cln[str(t_step)+corr+itstr][k]
-            if k==refant: 
-                phase_cln1[k,0,t_step]=0
-            elif k<refant:
-                phase_cln1[k,0,t_step]=tir_cln[str(t_step)+corr+itstr][k]
-            elif k>refant:
-                phase_cln1[k,0,t_step]=tir_cln[str(t_step)+corr+itstr][k-1]
+    for s in range(4):
+        spwstr=str(s)
+        for t_step in range(nutimes):
+            for k in range(nant):
+                amp_all1[k,0,t_step,s]=lir_all[str(t_step)+corr+itstr+spwstr][k]
+                if k==refant: 
+                    phase_all1[k,0,t_step,s]=0
+                elif k<refant:
+                    phase_all1[k,0,t_step,s]=tir_all[str(t_step)+corr+itstr+spwstr][k]
+                elif k>refant:
+                    phase_all1[k,0,t_step,s]=tir_all[str(t_step)+corr+itstr+spwstr][k-1]
+
+    #phase_arr=gf.nonan(phase_all1)
+    #amp_arr=gf.nonan(amp_all1)
+    '''
+    while np.any(np.abs(phase_ext[~np.isnan(phase_ext)])>180)==True:
+        #for t in range(len(antinfo['timestamp'])):
+        for t in range(nutimes):
+            for a in range(len(antlist)):
+                for s in range(4):
+                    wph=phase_ext[a,0,t,s]
+                    if np.isnan(wph)==False and wph>180: phase_ext[a,0,t,s]=wph-360
+                    if np.isnan(wph)==False and wph<-180: phase_ext[a,0,t,s]=wph+360
+    '''
+    #phase_cln1=np.zeros((nant,1,nutimes,nspw),dtype=float)
+    #amp_cln1=np.zeros((nant,1,nutimes,nspw),dtype=float)
+
+    '''
+    for s in range(nspw):
+        spwstr=str(s)
+        for t_step in range(nutimes):
+            for k in range(nant):
+                amp_cln1[k,0,t_step,s]=lir_cln[str(t_step)+corr+itstr+spwstr][k]
+                if k==refant: 
+                    phase_cln1[k,0,t_step,s]=0
+                elif k<refant:
+                    phase_cln1[k,0,t_step,s]=tir_cln[str(t_step)+corr+itstr+spwstr][k]
+                elif k>refant:
+                    phase_cln1[k,0,t_step,s]=tir_cln[str(t_step)+corr+itstr+spwstr][k-1]
 
     phase_cln=gf.nonan(phase_cln1)
     amp_cln=gf.nonan(amp_cln1)
-
-    ############################################
+    '''
+    '''
+    while np.any(np.abs(phase_cln[~np.isnan(phase_cln)])>180)==True:
+        #for t in range(len(antinfo['timestamp'])):
+        for t in range(nutimes):
+            for a in range(len(antlist)):
+                for s in range(4):
+                    wph=phase_cln[a,0,t,s]
+                    if np.isnan(wph)==False and wph>180: phase_cln[a,0,t,s]=wph-360
+                    if np.isnan(wph)==False and wph<-180: phase_cln[a,0,t,s]=wph+360
+    '''
     #avga=np.empty((nant,1,len(ELO_range)-1))
     #avgp=np.empty((nant,1,len(ELO_range)-1))
-    #############################################
 
-    phase_arr1=phase_ext-phase_cln
-    amp_arr1=amp_ext/amp_cln
-    phase_arr=ma.masked_where(amp_arr1>4,phase_arr1)
-    amp_arr=ma.masked_where(amp_arr1>4,amp_arr1)
+    #phase_arr1=phase_ext-phase_cln
+    #amp_arr1=amp_ext*amp_cln
+
+    phase_arr=ma.masked_where(amp_all1>3,phase_all1)
+    amp_arr=ma.masked_where(amp_all1>3,amp_all1)
+
+    while np.any(np.abs(phase_arr[~np.isnan(phase_arr)])>math.pi)==True:
+        #for t in range(len(antinfo['timestamp'])):
+        for t in range(nutimes):
+            for a in range(len(antlist)):
+                for s in range(nspw):
+                    wph=phase_arr[a,0,t,s]
+                    if np.isnan(wph)==False and wph>math.pi: phase_arr[a,0,t,s]=wph-(2.*math.pi)#-360
+                    if np.isnan(wph)==False and wph<(-1.*math.pi): phase_arr[a,0,t,s]=wph+(2.*math.pi)#+360
+
     #phase_arr=phase_cln
     #amp_arr=amp_cln
 
@@ -689,34 +811,26 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     '''
     plt.clf()
 
-    ##################################################################################################
-    ''''
-    print("Averaging gains...")
+    '''
     for k in range(nant):
-        for t_step in range(len(ELO_range)-1):
+        #for t_step in range(len(ELO_range)-1):
             tlist=[]
-            amplist=np.array([])
-            phlist=np.array([])
-            for x in antinfo['timestamp']:
-                if x>ELO_range[t_step] and x<=ELO_range[t_step+1]: 
+            amplist=[]
+            phlist=[]
+            #for x in antinfo['timestamp']:
+                #if x>ELO_range[t_step] and x<=ELO_range[t_step+1]: 
                     tlist.append(x)
                     ind=np.where(antinfo['timestamp']==x)
-                    amplist=ma.concatenate([amplist,antinfo['amp_'+corr+itstr][k][ind]])
-                    phlist=ma.concatenate([phlist,antinfo['phase_'+corr+itstr][k][ind]])
-                    #amplist.append(antinfo['amp_'+corr+itstr][k][ind])
-                    #phlist.append(antinfo['phase_'+corr+itstr][k][ind])
+                    amplist.append(antinfo['amp_'+corr+itstr][k][ind])
+                    phlist.append(antinfo['phase_'+corr+itstr][k][ind])
                 #print("ind",ind)
             #print("amplist",amplist)
-            #print("Avga",avga.shape)
-            #print("ELO",len(ELO))
             nda=len(amplist)
-            #print(nda)
-            #print(amplist)
-            #plt.scatter(ELO_range[t_step],nda)
-            avga[k,0,t_step]=amplist.mean()
-            avgp[k,0,t_step]=phlist.mean()
+            plt.scatter(ELO_range[t_step],nda)
+            avga[k,0,t_step]=ma.mean(amplist)
+            avgp[k,0,t_step]=ma.mean(phlist)
 
-            if np.isnan(amplist.mean())==True or np.isnan(phlist.mean())==True:
+            if np.isnan(ma.mean(amplist))==True or np.isnan(ma.mean(phlist))==True:
                 if nda==0:
                     print("That's okay!")
                     avga[:,0,t_step]=np.nan
@@ -725,188 +839,273 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
                 else: 
                     nbad+=1
             else: nonan+=1
-    '''
-    ###########################################################################
+
 
             #if k==refant and nda!=0: avgp[k,0,t_step]=0
             #elif k!=refant and nda!=0: avgp[k,0,t_step]=np.nanmean(phlist)
             #elif k<refant and nda!=0: avgp[k,0,t_step]=np.nanmean(phlist)
-        #plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png')
-        #plt.clf()
+        plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png')
+        plt.clf()
+    '''
 
-
-    #antinfo['avg_phase_'+corr+itstr]=np.squeeze(avgp)
-    #antinfo['avg_amp_'+corr+itstr]=np.squeeze(avga)    
-    
     antinfo['avg_phase_'+corr+itstr]=np.squeeze(phase_arr)
     antinfo['avg_amp_'+corr+itstr]=np.squeeze(amp_arr) 
 
-    print("Plotting gains...")
-    #for k in range(nant):
-    #    for t_step in range(len(ELO_range)-1):
+    '''
+    for k in range(nant):
+        for t_step in range(len(ELO_range)-1):
             #print("ELO_range")
             #print(ELO_range[t_step])
             #print(ELO_range[t_step+1])
-    #        nda=len([antinfo['amp_'+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
-    #        plt.scatter(ELO_range[t_step],nda)
-    #        ndb=len([lir_ext[str(t_step)+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
-    #        plt.scatter(ELO_range[t_step],nda)
+            nda=len([antinfo['amp_'+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+            plt.scatter(ELO_range[t_step],nda)
+            ndb=len([lir_ext[str(t_step)+corr+itstr][k] for x in range(ntimes) if antinfo['timestamp'][x]>=ELO_range[t_step] and antinfo['timestamp'][x]<=ELO_range[t_step+1]])
+            plt.scatter(ELO_range[t_step],nda)
 
         #plt.savefig('./dplots/ndtstep_ant'+str(k)+'_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png')
-        #plt.clf()
-    #plt.clf()
+        plt.clf()
+    plt.clf()
 
     #plt.clf()
-    #for a in range(nant):
-    #    plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
-    #    plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
-    #plt.legend()
-    #plt.show()
+    for a in range(nant):
+        plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
+        plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
+    plt.legend()
+    plt.show()
 
-    #plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ap_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
 
-    #plt.clf()
-
-    #for a in range(nant):
-    #    plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
-    #    plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gampavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
-        #plt.ylim(bottom=0.0,top=3.5)
-    #    plt.clf()
-    #plt.clf()
-
-
-    #for a in range(nant):
-    #    plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
-    #plt.legend()
-    #plt.show()
-
-    #plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
-
-
-    #plt.clf()
-
-    #for a in range(nant):
-    #    plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
-    #    plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gphavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
-    #plt.clf()
-
-
-    #for a in range(nant):
-    #    plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
-    #plt.legend()
-    #plt.show()
-
-    #plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
-
-    #plt.clf()
+    plt.clf()
 
     for a in range(nant):
-        plt.scatter(antinfo['timestamp'],antinfo['amp_'+corr+itstr][a],color='black',marker='x')
+        plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
+        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gampavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+        #plt.ylim(bottom=0.0,top=3.5)
+        plt.clf()
+    plt.clf()
+
+
+    for a in range(nant):
+        plt.scatter(ELO_range[:-1],avga[a,0,:],color='black',marker='x')
+    plt.legend()
+    plt.show()
+
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_a_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+
+
+    plt.clf()
+
+    for a in range(nant):
+        plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
+        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gphavg_'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+    plt.clf()
+
+
+    for a in range(nant):
+        plt.scatter(ELO_range[:-1],avgp[a,0,:],color='red')
+    plt.legend()
+    plt.show()
+
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_p_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+
+    plt.clf()
+    '''
+
+    for a in range(nant):
+        for s in range(nspw):
+            spwstr=str(s)
+            plt.scatter(utbt,antinfo['amp_'+corr+itstr][a,:,s],color='black',marker='x')
         plt.show()
-        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gamp'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
+        plt.savefig('./dplots/antgains/amp/ant'+str(a)+'_gamp'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
         #plt.show()
         #plt.ylim(bottom=0.0,top=3.5)
         plt.clf()
     plt.clf()
 
-    for a in range(nant):
-        plt.scatter(antinfo['timestamp'],antinfo['amp_'+corr+itstr][a],color='black',marker='x')
-    plt.legend()
+    for s in range(nspw):
+        spwstr=str(s)
+        for a in range(nant):
+            plt.scatter(utbt,antinfo['amp_'+corr+itstr][a,:,s],color='black',marker='x')
+    #plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampdi_'+auth+'_'+case+corr+itstr+'1.png')
 
     plt.clf()
 
     for a in range(nant):
-        plt.scatter(antinfo['timestamp'],antinfo['phase_'+corr+itstr][a],color='red')
+        for s in range(nspw):
+            spwstr=str(s)
+            plt.scatter(utbt,antinfo['phase_'+corr+itstr][a,:,s],color='red')
         plt.show()
-        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gph'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
+        plt.savefig('./dplots/antgains/phase/ant'+str(a)+'_gph'+date+'_'+refmeth+'_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
         #plt.show()
         plt.clf()
     plt.clf()
 
-    for a in range(nant):
-        plt.scatter(antinfo['timestamp'],antinfo['phase_'+corr+itstr][a],color='red')
+    for s in range(nspw):
+        spwstr=str(s)
+        for a in range(nant):
+            plt.scatter(utbt,(180./math.pi)*antinfo['phase_'+corr+itstr][a,:,s],color='red')
     plt.legend()
     plt.show()
 
-    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+corr+itstr+'.png',overwrite=True)
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phasedi_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
 
     plt.clf()
 
+    '''
+    for s in range(nspw):
+        for a in range(nant):
+            plt.scatter(utbt,phase_cln[a,0,:,s],color='red')
+    #plt.legend()
+    plt.show()
 
-    print("Intervals with pts:",nonan)
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phaseclndi_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+
+    plt.clf()
+
+    for s in range(nspw):
+        for a in range(nant):
+            plt.scatter(utbt,phase_ext[a,0,:,s],color='red')
+    #plt.legend()
+    plt.show()
+
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_phaseextdi_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+
+    plt.clf()
+
+    for s in range(nspw):
+        for a in range(nant):
+            plt.scatter(utbt,amp_cln[a,0,:,s],color='black')
+    #plt.legend()
+    plt.show()
+
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampclndi_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+
+    plt.clf()
+
+    for s in range(nspw):
+        for a in range(nant):
+            plt.scatter(utbt,amp_ext[a,0,:,s],color='black')
+    #plt.legend()
+    plt.show()
+
+    plt.savefig('./dplots/ndpv_'+date+'_'+refmeth+'_ampextdi_'+auth+'_'+case+corr+itstr+'1.png',overwrite=True)
+
+    plt.clf()
+    '''
+
+
+    #print("Intervals with pts:",nonan)
     #print("Total intervals:",len(ELO_range)-1)
-    print("Bad baseline/antenna cases",nbad)
-    print("Empty bins",nemp)
-    print("Total points:",len(antinfo['timestamp']))
+    #print("Bad baseline/antenna cases",nbad)
+    #print("Empty bins",nemp)
+    #print("Total points:",len(antinfo['timestamp']))
 
 
     #newpt=np.zeros_like(xx)
     #newres=np.zeros_like(xx)
-    tb1=0
+    #tb1=0
 
     #Opening data and pulling necessary info
-    ms.open(dvis,nomodify=True)
-    ms.selectinit(reset=True)
-    visdata1 = ms.getdata(['antenna1','antenna2','data','axis_info','flag'],ifraxis=True)
+    #ms.open(dvis,nomodify=True)
+    #ms.selectinit(reset=True)
+    #visdata1 = ms.getdata(['antenna1','antenna2','data','axis_info','flag'],ifraxis=True)
 
     #Squeeze data then close ms
 
-    visdata1['data'] = np.squeeze(visdata1['data'])
-    ms.close()
+    #visdata1['data'] = np.squeeze(visdata1['data'])
+    #ms.close()
 
-    antinfo1,xx1=antfunc(dfile=dvis,it=it,pol=pol,date=date)
+    #with open('data/rawData.pickle', 'rb') as f:
+    #    visdata1 = pickle.load(f)
 
-    newpt=np.zeros_like(xx1)
+    #HERE!
+    tb.open(dvis)
+    tbData1=tb.getcol('DATA')
+    tbDataV=np.squeeze(tbData1)
+    tbFlag1=tb.getcol('FLAG')
+    tbFlagV=np.squeeze(tbFlag1)
+    tbtV=tb.getcol('TIME')
+    tba1V=tb.getcol('ANTENNA1')
+    tba2V=tb.getcol('ANTENNA2')
+    tbVspw=tb.getcol('DATA_DESC_ID')
+    tb.close()
 
-    print("Applying gains...") 
+    with open('data/antinfoIt'+str(it)+'.pickle', 'wb') as f:
+        pickle.dump(antinfo, f)
 
-    for t_step in range(len(ELO_range)-1):
-        tchunk=0
-        listt=[]
-        for t in antinfo['timestamp']:
-            if t>=ELO_range[t_step] and t<ELO_range[t_step+1]: 
-                tchunk+=1
-                listt.append(t)
-        #[antinfo['timestamp'][x] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])]
-        #for i in range(len(tchunk)):
-        for i in range(tchunk):
-            thistime=(visdata1['axis_info']['time_axis']['MJDseconds']==listt[i])
-            time=i
+    xx1,xx1sig=antfunc(dfile=dvis,it=it,pol=pol,date=date,case='raw')
+
+
+    newpt=np.zeros_like(xx1,dtype=np.complex128)
+    #newpt=np.zeros((nbl,len(utbt)),dtype=np.complex128)
+
+    #for t_step in range(len(ELO_range)-1):
+    for spw in range(nspw):
+        spwstr=str(spw)
+        for t_step in range(len(utbt)):
+            #print(t_step)
+            #tchunk=0
+            #listt=[]
+            #for t in antinfo['timestamp']:
+                #if t>=ELO_range[t_step] and t<ELO_range[t_step+1]: 
+                    #tchunk+=1
+                    #listt.append(t)
+            #[antinfo['timestamp'][x] for x in range(len(tkeys)) if (tkeys[x]>=ELO_range[t_step] and tkeys[x]<=ELO_range[t_step+1])]
+            #for i in range(len(tchunk)):
+            #for i in range(tchunk):
+            #thistime=(visdata1['axis_info']['time_axis']['MJDseconds']==listt[i])
+            #thistime=(visdata1['axis_info']['time_axis']['MJDseconds']==antinfo['timestamp'][t_step])
+            #thistime=(tbtV==antinfo['timestamp'][t_step])
+            #thistime=(tbtV==utbt[t_step])
+            time=t_step
             #indt=np.where(visdata1['axis_info']['time_axis']['MJDseconds']==listt[i])
 
-            gt=antinfo['goodt_'+corr+itstr][i]
+            #gt=antinfo['goodt_'+corr+itstr+spwstr][t_step]
 
             #Pulling antennas that are bad for this time
             #Calculating number of antennas and baselines
             #-1 is to account for bad ants (ant1=-1 is not valid) 
             #need to rework how pt is pulled
             nb1=0
-            for ant1 in np.unique(visdata1['antenna1']):
-                for ant2 in np.unique(visdata1['antenna2']):
+            for ant1 in np.unique(tba1V):
+                for ant2 in np.unique(tba2V):
                     if ant1 < ant2:
-                        thisbase = (visdata1['antenna1']==ant1) & (visdata1['antenna2']==ant2)
+                        thispt = (tba1V==ant1) & (tba2V==ant2) & (tbtV==utbt[t_step]) & (tbVspw==spw)
+                        #thistime = (tbt==t_step)
                         iant1=np.where(antlist==ant1)[0][0]
                         iant2=np.where(antlist==ant2)[0][0]
-                        if thisbase.sum()>0:
+                        #if thispt.sum()==0: 
+                        #    newpt[nb1,t_step]=np.nan
+                        #    nb1+=1
+                        if thispt.sum()>0:
                             #pt=xx[thisbase][0][tb1]
-                            pt1=xx1[thisbase][0][tb1]
-                            ga1=antinfo['avg_amp_'+corr+itstr][iant1][t_step]
-                            ga2=antinfo['avg_amp_'+corr+itstr][iant2][t_step]
+                            #pt1=xx1[thisbase][0][tb1]
+                            pt1=xx1[thispt][0]
+                            ga1=antinfo['avg_amp_'+corr+itstr][iant1][t_step][spw]
+                            ga2=antinfo['avg_amp_'+corr+itstr][iant2][t_step][spw]
                             if iant1==iref: 
                                 gp1=0.
                             else:
-                                gp1=antinfo['avg_phase_'+corr+itstr][iant1][t_step]
+                                gp1=antinfo['avg_phase_'+corr+itstr][iant1][t_step][spw]
+                                #gp1d=antinfo['avg_phase_'+corr+itstr][iant1][t_step][spw]
+                                #gp1=radians(gp1d)
                             if iant2==iref:
                                 gp2=0.
                             else:
-                                gp2=antinfo['avg_phase_'+corr+itstr][iant2][t_step]
+                                gp2=antinfo['avg_phase_'+corr+itstr][iant2][t_step][spw]
+                                #gp2d=antinfo['avg_phase_'+corr+itstr][iant2][t_step][spw]
+                                #gp2=radians(gp2d)
                             #newres[nb1,tb1]=pt*(ga1*ga2*np.exp(1.0j*(gp1-gp2)))
-                            newpt[nb1,tb1]=pt1/(ga1*ga2*np.exp(1.0j*(gp2-gp1)))
+                            #newpt[nb1,t_step]=pt1*(ga1*ga2*np.exp(1.0j*(gp1-gp2)))
+                            #newpt[nb1,t_step]=pt1/(ga1*ga2*(e**(1.0j*(gp1-gp2))))
+                            newpt[thispt]=pt1/(ga1*ga2*(e**(1.0j*(gp1-gp2))))
+                            if np.abs(newpt[thispt])==0:newpt[thispt]=np.nan
+                            #pdb.set_trace()
                             nb1+=1
-            tb1+=1
+        #tb1+=1
     #ast.write("TB1\n")
     #ast.write(str(tb1))
 
@@ -922,34 +1121,50 @@ def lls(pol,corr,datams1,target,case,auth,refmeth,date,it,dvis,rfant,datams_cm):
     plt.savefig("./dplots/resplot_"+auth+date+corr+itstr+".png",overwrite=True)
     plt.clf()
     '''
-
-    for t in range(nb1):
-        oldp=np.array(xx1[t])
+    #for s in range(4):
+    #just need oldp then tbtV
+    '''
+    for t in range(len(tt)):
+        thispt=(tbtV==utbt[t])
+        oldp=np.array(xx1[thispt])
         #newp=np.array(newpt[t])
         #newv=np.array(newpt[t])
-        plt.plot(tt,np.abs(oldp),".",c='b')
+        plt.plot([tt[t]]*len(oldp),np.abs(oldp),".",c='b')
+        #plt.ylim(top=4.5,bottom=0)
         #plt.plot(tt,np.abs(newv),".",c='r')
+    '''
+    #plt.xlim(left=2.5,right=13.5)
+    plt.plot(tt,np.abs(xx1),".",c='b')
     plt.show()
     plt.savefig("./dplots/oldvisplot_"+auth+date+corr+itstr+".png",overwrite=True)
     plt.clf()
 
-    for t in range(nb1):
+    '''
+    for t in range(nbl):
         #oldp=np.array(xx1[t])
-        #newp=np.array(newpt[t])
-        newv=np.array(newpt[t])
+        newp=np.array(newpt[t])
+        #thispt=(tbtV==utbt[t])&(tbspw==0)
+        #newv=np.array(xx1[thispt])
         #plt.plot(tt,np.abs(oldp),".",c='b')
-        plt.plot(tt,np.abs(newv),".",c='r')
+        plt.plot(tt,np.abs(newp),".",c='r')
+    '''
+    #plt.xlim(left=2.5,right=13.5)
+    plt.plot(tt,np.abs(newpt),".",c='r')
     plt.show()
     plt.savefig("./dplots/newvisplot_"+auth+date+corr+itstr+".png",overwrite=True)
     plt.clf()
 
-
-    #gf.dict_update(antinfo,'newres_'+corr+itstr,newres)
-    gf.dict_update(antinfo1,'newvis_'+corr+itstr,newpt)
+    #gf.dict_update(antinfo,'newres_'+corr+itstr,newpt)
+    gf.dict_update(antinfo,'newvis_'+corr+itstr,newpt)
+    with open('data/antinfoIt'+str(it)+'.pickle', 'wb') as f:
+        pickle.dump(antinfo, f)
+    with open('data/newvisIt'+str(it)+'.pickle', 'wb') as f:
+        pickle.dump(newpt, f)
 
     #ast.close()
-    return newpt,antinfo1
+    return newpt,antinfo
     #newres,x,antinfo,x
+
 
 
 ##################################################################
@@ -960,13 +1175,15 @@ stop=0
 start=time.time()
 
 #this is for Venki data
-target='sgr_apr07'
+target='sgr_apr24'
 
 #for image names
 case='allant'
-auth='Venki'
-refmeth='ref8'
-date='01202023_'+str(attn)
+auth='Jasmin'
+#refmeth='ref35'
+refmeth='ref6'
+date='05052023_'+str(attn)
+refant=6
 
 #datams2=target+'_flagcor.ms'
 
@@ -977,7 +1194,35 @@ date='01202023_'+str(attn)
 #Initial data file name and name for channel-averaged file
 #datams1=target+'_flagcor_noflags.ms'
 #datams1=flagfile
-datams0='sgr_apr07_flag.ms'
+#datams_noavg='sgr_apr07_flag.ms'
+#datams0='sgr_apr24_200scanXXYY.ms'
+datams_noavg='sgr_apr24_final_XXYY.ms'
+#datams_noavg='sgr_apr24_mid.ms'
+#datams0='sgr_apr24_final_XXYY_rdata_avg60s.ms'
+
+rdavg=datams_noavg[:-3]+'_rdata_avg'+tavg+'.ms'
+os.system('rm -rf '+rdavg+' '+rdavg+'.flagversions')
+split(vis=datams_noavg,
+      outputvis=rdavg,
+      timebin=tavg,
+      combine='state,scan',
+      datacolumn='data',keepflags=False)
+clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
+
+datams_nf=rdavg
+
+siggobble(datams_nf,tavgint)
+
+rdflag=datams_noavg[:-3]+'_rflag_avg'+tavg+'.ms'
+os.system('rm -rf '+rdflag+' '+rdflag+'.flagversions')
+split(vis=rdavg,
+      outputvis=rdflag,
+      #timebin=tavg,
+      #combine='state,scan',
+      datacolumn='corrected',keepflags=False)
+clearcal(vis=rdflag,spw='0,1,2,3',addmodel=True)
+
+datams0=rdflag
 
 #Getting file name
 dmsprefix=datams0[:-3]
@@ -994,8 +1239,8 @@ datams1=resavg
 os.system('rm -rf '+resavg+' '+resavg+'.flagversions')
 split(vis=datams0,
       outputvis=resavg,
-      timebin=tavg,
-      combine='state,scan',
+      #timebin=tavg,
+      #combine='state,scan',
       datacolumn='data',keepflags=False)
 
 #mstransform(vis=datams3,outputvis=dmsavg,keepflags=False,timeaverage=True,timebin='240s',timespan='scan,state',datacolumn='data')
@@ -1042,30 +1287,50 @@ os.system('rm -rf '+dmsprefix+'_selfcal*_ext2_it*.ms')
 
 clearcal(vis=datams0,spw='0,1,2,3',addmodel=True)
 
+tbdata={}
+tb.open(datams0)
+tbdata['data']=tb.getcol('DATA')
+tbdata['data']=np.squeeze(tbdata['data'])
+tbdata['flag']=tb.getcol('FLAG')
+tbdata['flag']=np.squeeze(tbdata['flag'])
+tbdata['time']=tb.getcol('TIME')
+tbdata['antenna1']=tb.getcol('ANTENNA1')
+tbdata['antenna2']=tb.getcol('ANTENNA2')
+tbdata['sigma']=tb.getcol('SIGMA')
+tb.close()
 
 ms.open(datams0,nomodify=True)
-visdata = ms.getdata(['antenna1','antenna2','data','flag','data_desc_id','sigma','axis_info'],ifraxis=True)
-visdata['data'] = np.squeeze(visdata['data'])
+visdata = ms.getdata(['axis_info'],ifraxis=True)
+#visdata['data'] = np.squeeze(visdata['data'])
 ms.close()
 
-
-allants=np.concatenate((visdata['antenna1'],visdata['antenna2']))
+#tb.open(datams0)
+#a1=tb.getcol('ANTENNA1')
+#a2=tb.getcol('ANTENNA2')
+#tb.close()
+#allants=np.concatenate((a1,a2))
+#antlist=np.unique(allants)
+allants=np.concatenate((tbdata['antenna1'],tbdata['antenna2']))
 antlist=np.unique(allants)
 
 print(antlist)
 
 #Number of polarizations
-npol=visdata['data'].shape[0]
+npol=tbdata['data'].shape[0]
 polnames=visdata['axis_info']['corr_axis']
+#npol=len(polnames)
+#print("NPOL",npol)
 #corr=polnames[pol]
 
 
 #Calculating number of antennas and baselines
 nant=int(len(antlist))
 nbl=int(nant*(nant-1)/2)
-ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
+#ntimes=len(visdata['axis_info']['time_axis']['MJDseconds'])
+ntimes=len(np.unique(tbdata['time']))
 
-tt=np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)
+#tt=np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)
+tt=np.array(np.unique(tbdata['time']))
 
 '''
 fstore=np.zeros_like(visdata['data'])
@@ -1119,7 +1384,7 @@ for i in range(npol):
 print(nant)
 print(nbl)
 
-ELO=np.unique(visdata['axis_info']['time_axis']['MJDseconds'])
+ELO=np.unique(tbdata['time'])
 '''
 #Creating a tf dictionary for each ant and whether time is good or bad there
 antinfo=dict()
@@ -1136,8 +1401,8 @@ tt=np.array(visdata['axis_info']['time_axis']['MJDseconds'],dtype=float)
 #####################################
 '''
 
-print(len(visdata['axis_info']['time_axis']['MJDseconds']))
-print(len(np.unique(visdata['axis_info']['time_axis']['MJDseconds'])))
+#print(len(visdata['axis_info']['time_axis']['MJDseconds']))
+#print(len(np.unique(visdata['axis_info']['time_axis']['MJDseconds'])))
 
 
 
@@ -1180,28 +1445,32 @@ scan = tb.getcol('SCAN_NUMBER')
 #resres=np.zeros_like(visdata0)
 tb.close()
 
-tb.open(resavg,nomodify=True)
-visdata0=tb.getcol('DATA')
-resres=np.zeros_like(visdata0)
-tb.close()
+#tb.open(resavg,nomodify=True)
+#visdata0=tb.getcol('DATA')
+#resres=np.zeros_like(visdata0)
+#scanavg=tb.getcol('SCAN_NUMBER')
+#tb.close()
+
 
 #Print scan numbers for edification
 scan = np.unique(scan)
 print(scan)
+#scanavg = np.unique(scanavg)
 
 
 
 #Calculating RMS of data for CLEAN threshold
 #ms.open(datams1,nomodify=True)
-ms.open(datams0,nomodify=True)
-sigs=ms.getdata(['sigma'])
-fsigs=np.asarray(sigs['sigma']).flatten()
+#ms.open(datams0,nomodify=True)
+#sigs=ms.getdata(['sigma'])
+#fsigs=np.asarray(sigs['sigma']).flatten()
+fsigs=tbdata['sigma']
 print("Fsig shape:",fsigs.shape)
 invsigs=1./(fsigs*fsigs)
 sumsigs=np.sum(invsigs)
 rmst=2.*np.sqrt(1./sumsigs)
 print("RMS: %e" %(rmst))
-ms.close()
+#ms.close()
 
 
 
@@ -1209,8 +1478,8 @@ ms.close()
 g=open("uvmflux_"+target+".txt","w")
 g.write("it scan ext mod moderr\n")
 
-e=open("nv_"+target+".txt","w")
-e.write("")
+q=open("nv_"+target+".txt","w")
+q.write("")
 
 
 '''
@@ -1245,28 +1514,34 @@ it=0
 #iref=np.where(antlist==refant)[0][0]
 
 #refant=35 #DV20 index
-refant=8
+#refant=5
 iref=np.where(antlist==refant)[0][0]
 
 
 #The wily (formerly) infinite while loop
 #while(1):
 while it<=0:
-    rdavg=dmsprefix+'_rdata_avg'+tavg+'.ms'
-    os.system('rm -rf '+rdavg+' '+rdavg+'.flagversions')
-    split(vis=rawdata,
-          outputvis=rdavg,
-          timebin=tavg,
-          combine='state,scan',
-          datacolumn='data',keepflags=False)
-    clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
+    plt.clf()
+    #rdavg=dmsprefix+'_rdata_avg'+tavg+'.ms'
+    #os.system('rm -rf '+rdavg+' '+rdavg+'.flagversions')
+    #split(vis=rawdata,
+    #      outputvis=rdavg,
+    #      timebin=tavg,
+    #      combine='state,scan',
+    #      datacolumn='data',keepflags=False)
+    #clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
 
-    e.write("ITERATION "+str(it)+"\n")
+    #datams1=rdavg
 
-    ms.open(rdavg)
-    adata=ms.getdata(['data'],ifraxis=True)
-    adata['data']=np.squeeze(adata['data'])
-    ms.close()
+    q.write("ITERATION "+str(it)+"\n")
+
+    #ms.open(rdavg)
+    #adata=ms.getdata(['data'],ifraxis=True)
+    #adata['data']=np.squeeze(adata['data'])
+    #ms.close()
+    #tb.open(rdavg)
+    #adata=tb.getcol('DATA')
+    #tb.close()
 
     #Declaring empty arrays for mod UVM flux and error
     muvmf=np.array([])
@@ -1291,8 +1566,9 @@ while it<=0:
 
     #Cycle through each scan
     for s in scan:
+    #for s in scanavg:
         #print(s)
-        #if s==359:continue
+        if s==359:continue
         #UVM for extended structure leftover from fit
         sc=int(s)
         myuvfit_ext1 = uvm.uvmultifit(vis=datams_ext,
@@ -1307,6 +1583,7 @@ while it<=0:
                     write='residuals') # will write residuals in the 'corrected' column, but only for the subset of fitted channels !
         # to run on the continuum collapsed cube
         ruvmf=np.append(ruvmf,myuvfit_ext1.result['Parameters'][0])
+        plt.scatter(s,myuvfit_ext1.result['Parameters'][0])
 
         #UVM for model visibilities
         myuvfit_mod = uvm.uvmultifit(vis=datams_mod,
@@ -1319,13 +1596,16 @@ while it<=0:
                     OneFitPerChannel=False,
                     column='data',
                     write='model') # will write best-fit model in the 'model' column, but only for the subset of fitted channels !
-        tb.open(datams_mod)
-        md=tb.getcol('MODEL_DATA')
-        tb.close()
+        #tb.open(datams_mod)
+        #md=tb.getcol('MODEL_DATA')
+        #tb.close()
         #Appending results of UVM to list
         muvmf=np.append(muvmf,myuvfit_mod.result['Parameters'][0])
         muvmferr=np.append(muvmferr,myuvfit_mod.result['Uncertainties'][0])
 
+    plt.savefig(target+'uvmresults'+date+'.png',overwrite=True)
+    plt.show()
+    plt.clf()
     #Pulling residuals of UVM pt source fitting for analysis
     tb.open(datams_ext)
     ext1=tb.getcol('CORRECTED_DATA')
@@ -1337,12 +1617,13 @@ while it<=0:
     #Splitting and creating the files
     #The datacolumn here means nothing, it will be replaced
     os.system('rm -rf '+datams_ext2)
-    split(vis=datams_ext,outputvis=datams_ext2,datacolumn='data',keepflags=False)
+    split(vis=datams_ext,outputvis=datams_ext2,datacolumn='corrected',keepflags=False)
 
     #Making the residuals of the first UVMULTIFIT the data column of the new file
-    tb.open(datams_ext2,nomodify=False)
-    tb.putcol('DATA', ext1)
-    tb.close()
+    #4/26/23 - just changed split again???
+    #tb.open(datams_ext2,nomodify=False)
+    #tb.putcol('DATA', ext1)
+    #tb.close()
 
     #Clearing/creating corrected/model columns
     clearcal(vis=datams_ext2,spw='0,1,2,3',addmodel=True)
@@ -1388,21 +1669,23 @@ while it<=0:
     os.system('rm -rf '+datams_ext3+' '+datams_ext3+'.flagversions')
     split(vis=datams_ext2,outputvis=datams_ext3,datacolumn='corrected')
     '''
-    tb.open(datams_ext2)
-    ext2=tb.getcol('CORRECTED_DATA')
-    tb.close()
+    #tb.open(datams_ext2)
+    #ext2=tb.getcol('CORRECTED_DATA')
+    #tb.close()
 
-    ext21=np.zeros_like(visdata['data'])
+    #ext21=np.zeros_like(tbdata['data'])
 
-    ms.open(datams_ext2)
-    edata=ms.getdata(['corrected_data'],ifraxis=True)
-    ext21[:,:,:]=np.squeeze(edata['corrected_data'])
-    ms.close()
+    #ms.open(datams_ext2)
+    #edata=ms.getdata(['corrected_data'],ifraxis=True)
+    #ext21[:,:,:]=np.squeeze(edata['corrected_data'])
+    #ms.close()
+    
 
     #Splitting and creating the files
     #The datacolumn here means nothing, it will be replaced
+    #4/26/23: changed data to corrected??
     os.system('rm -rf '+datams_ext3+' '+datams_ext3+'.flagversions')
-    split(vis=datams_ext2,outputvis=datams_ext3,datacolumn='data',keepflags=False)
+    split(vis=datams_ext2,outputvis=datams_ext3,datacolumn='corrected',keepflags=False)
     clearcal(vis=datams_ext3,spw='0,1,2,3',addmodel=True)
 
     #Making the residuals of the first UVMULTIFIT the data column of the new file
@@ -1410,12 +1693,20 @@ while it<=0:
     #tb.putcol('DATA', ext2)
     #tb.close()
 
-    ms.open(datams_ext3,nomodify=False)
-    nv1=ms.getdata(['data'],ifraxis=True)
-    nv1['data'][:,0,:,:]=ext21
-    ms.putdata(nv1)
-    ms.close()
+    #ms.open(datams_ext3,nomodify=False)
+    #nv1=ms.getdata(['data'],ifraxis=True)
+    #nv1['data'][:,0,:,:]=ext21
+    #ms.putdata(nv1)
+    #ms.close()
 
+    #dme3avg=datams_ext3[:-3]+'avg'+tavg+'_it'+'{0:02d}'.format(it)+'.ms'
+    #Splitting and channel averaging (if desired)
+    #os.system('rm -rf '+dme3avg+' '+dme3avg+'.flagversions')
+    #split(vis=datams_ext3,
+    #      outputvis=dme3avg,
+    #      #timebin=tavg,
+    #      combine='state,scan',
+    #      datacolumn='data',keepflags=False)
 
     imname_dc=dmsprefix+'_it'+'{0:02d}'.format(it)+'_dirtyext'
     os.system('rm -rf '+imname_dc+'.*')
@@ -1431,7 +1722,7 @@ while it<=0:
 
 
     #Cleaning residuals
-    imname1=dmsprefix+'_it'+'{0:02d}'.format(it)+'_cmodel'
+    imname1=dmsprefix+'_it'+'{0:02d}'.format(it)+'_cleanext'
     os.system('rm -rf '+imname1+'.*')
     r2c=tclean(vis=datams_ext3,
            field="0",
@@ -1446,32 +1737,22 @@ while it<=0:
            interactive=0,
            cell='0.2arcsec')
 
-    mscm=dmsprefix+'_cmodel_avg'+tavg+'_it'+'{0:02d}'.format(it)+'.ms'
-    os.system('rm -rf '+mscm+' '+mscm+'.flagversions')
-    split(vis=datams_ext3,
-          outputvis=mscm,
-          timebin=tavg,
-          combine='state,scan',
-          datacolumn='model',keepflags=False)
+    #mscm=dmsprefix+'_cmodel_avg'+tavg+'_it'+'{0:02d}'.format(it)+'.ms'
+    #os.system('rm -rf '+mscm+' '+mscm+'.flagversions')
+    #split(vis=dme3avg,
+    #      outputvis=mscm,
+    #      #timebin=tavg,
+    #      combine='state,scan',
+    #      datacolumn='model',keepflags=False)
 
-    dmodavg=datams_mod[:-3]+'avg'+tavg+'_it'+'{0:02d}'.format(it)+'.ms'
+    datams_cln=dmsprefix+'_cln_it'+'{0:02d}'.format(it)+'.ms'
     #Splitting and channel averaging (if desired)
-    os.system('rm -rf '+dmodavg+' '+dmodavg+'.flagversions')
-    split(vis=datams_mod,
-          outputvis=dmodavg,
-          timebin=tavg,
-          combine='state,scan',
-          datacolumn='model',keepflags=False)
-
-    dme3avg=datams_ext3[:-3]+'avg'+tavg+'_it'+'{0:02d}'.format(it)+'.ms'
-    #Splitting and channel averaging (if desired)
-    os.system('rm -rf '+dme3avg+' '+dme3avg+'.flagversions')
+    os.system('rm -rf '+datams_cln+' '+datams_cln+'.flagversions')
     split(vis=datams_ext3,
-          outputvis=dme3avg,
-          timebin=tavg,
-          combine='state,scan',
-          datacolumn='data',keepflags=False)
-
+          outputvis=datams_cln,
+          #timebin=tavg,
+          #combine='state,scan',
+          datacolumn='model',keepflags=False)
         
     '''
     #Self-calibrating final cleaned residuals
@@ -1500,9 +1781,9 @@ while it<=0:
     #avgdata=ms.getdata(['data'],ifraxis=True)
     #ms.close()
 
-    #newvis=np.zeros_like(visdata['data'])
+    newvis=np.zeros_like(tbdata['data'])
     #Zeros like data array for averaged data
-    newvis1=np.zeros_like(adata['data'])
+    #newvis1=np.zeros_like(adata)
     #newvis1=np.zeros_like(avgdata['data'])
     #antinfo=dict()
     antinfo1=dict()
@@ -1511,7 +1792,7 @@ while it<=0:
         plt.clf()
         #newvis[p],newvis1[p],newantinfo,newantinfo1
         #newvis1[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=datams_ext3,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rawdata,rfant=refant,datams_cm=mscm)
-        newvis1[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=dme3avg,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rdavg,rfant=refant,datams_cm=mscm)
+        newvis[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=datams_ext3,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rawdata,rfant=refant,datams_cm=datams_cln)
         plt.clf()
         #newvis1[p],newantinfo1=lls(pol=p,corr=polnames[p],datams1=datams_ext3,target=target,case=case,auth=auth,refmeth=refmeth,date=date,it=it,dvis=rawdata)
         #antinfo.update(newantinfo)
@@ -1536,30 +1817,33 @@ while it<=0:
     ms.close()
     '''
 
-    ms.open(rdavg,nomodify=False)
+    tb.open(rawdata,nomodify=False)
     #ms.open(rawdata,nomodify=False)
-    nv1=ms.getdata(['corrected_data'],ifraxis=True)
-    nv1['corrected_data'][:,0,:,:]=newvis1
-    ms.putdata(nv1)
-    ftnv1=nv1['corrected_data'][0]
-    e.write(str(ftnv1)+"\n")
-    print(ftnv1)
-    ms.close()
+    nv1=tb.getcol('CORRECTED_DATA')
+    nv1[:,0,:]=newvis1
+    tb.putcol('CORRECTED_DATA',nv1)
+    #ms.putdata(nv1)
+    #ftnv1=nv1['corrected_data'][0]
+    #q.write(str(ftnv1)+"\n")
+    #print(ftnv1)
+    #ms.close()
+    tb.close()
 
     #ms.open(rawdata,nomodify=True)
-    ms.open(rdavg,nomodify=True)
-    nnv1=ms.getdata(['corrected_data'],ifraxis=True)
-    ftnnv1=nnv1['corrected_data'][0]
-    e.write(str(ftnnv1)+"\n")
-    print(ftnnv1)
-    ms.close()
+    #ms.open(rawdata,nomodify=True)
+    #nnv1=ms.getdata(['corrected_data'],ifraxis=True)
+    #ftnnv1=nnv1['corrected_data'][0]
+    #q.write(str(ftnnv1)+"\n")
+    #print(ftnnv1)
+    #ms.close()
 
 
 
     #Dirty image of gain-calibrated data
     imname3=dmsprefix+'_it'+'{0:02d}'.format(it)+'_gainappl'
     os.system('rm -rf '+imname3+'.*')
-    r2c1=tclean(vis=rdavg,#vis=rawdata,
+    r2c1=tclean(#vis=rdavg
+        vis=rawdata,
            imagename=imname3,
            spw='0,1,2,3',
            datacolumn='corrected',
@@ -1596,12 +1880,12 @@ while it<=0:
 
     os.system('rm -rf '+dms_selfcal+' '+dms_selfcalf)
     #split(vis=rawdata,outputvis=dms_selfcal,datacolumn='corrected',keepflags=False)
-    split(vis=rdavg,outputvis=dms_selfcal,datacolumn='corrected',keepflags=False)
+    split(vis=rawdata,outputvis=dms_selfcal,datacolumn='corrected',keepflags=False)
 
 
     os.system('rm -rf '+dms_selfcal_copy+' '+dms_selfcalf_copy)
     #split(vis=rawdata,outputvis=dms_selfcal_copy,datacolumn='corrected',keepflags=False)
-    split(vis=rdavg,outputvis=dms_selfcal_copy,datacolumn='corrected',keepflags=False)
+    split(vis=rawdata,outputvis=dms_selfcal_copy,datacolumn='corrected',keepflags=False)
 
     #os.system('rm -rf '+dms_selfcal_ext+' '+dms_selfcalf_ext)
     #split(vis=datams_ext3,outputvis=dms_selfcal_ext,datacolumn='corrected',keepflags=False)
@@ -1625,7 +1909,7 @@ while it<=0:
     tb.close()
 
     #Subtracting residuals from full data to hopefully get point source
-    dminres=scdata-resids
+    #dminres=scdata-resids
 
     '''
     #Dummy file for plotting
@@ -1711,7 +1995,7 @@ dms_selfcal1=dmsprefix+"_selfcal_copy_it"+str(it-1)+".ms"
 #dms_selfcal1_ext=dmsprefix+"_selfcal_ext_it"+str(it-1)+".ms"
 
 
-tb.open(dms_selfcal1_ext)
+tb.open(dme3avg)
 resids=tb.getcol('DATA')
 tb.close()
 
@@ -1740,14 +2024,14 @@ muvmferr=np.array([])
 datams_mod=dmsprefix+'_mod_final.ms'
 
 #cvis.append(str(datams_mod))
-#os.system('rm -rf '+datams_mod)
-#split(vis=datams_ext3_sc,outputvis=datams_mod,datacolumn='data',keepflags=False)
+os.system('rm -rf '+datams_mod)
+split(vis=datams_ext3_sc,outputvis=datams_mod,datacolumn='data',keepflags=False)
 
 #Clearing/creating corrected and model columns
-#clearcal(vis=datams_mod,spw='0,1,2,3',addmodel=True) 
+clearcal(vis=datams_mod,spw='0,1,2,3',addmodel=True) 
 
 #Cycle through each scan
-for s in scan:
+for s in scanavg:
     sc=int(s)
 
     #UVM for model visibilities
@@ -1769,7 +2053,7 @@ plt.savefig('sgra_selfcal_scanbyscan_'+target+'_final_'+date+'.png')
 #Creating file for extended structure around Sgr A*
 datams_fin=dmsprefix+'_extsum.ms'
 os.system('rm -rf '+datams_fin)
-split(vis=dmsavg,outputvis=datams_fin,datacolumn='data')
+split(vis=dme3avg,outputvis=datams_fin,datacolumn='data')
 
 #Taking sum of residuals and putting it as the data column for this file
 tb.open(datams_fin,nomodify=False)
