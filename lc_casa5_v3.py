@@ -255,8 +255,8 @@ def gsolve(nbl,nant,vdata,varr,varrcln,antlist,corr,itstr,refant,tba1,tba2,tbt,t
 
             #New Jacobian and vis chunks
             jac=np.zeros((2*nbl,nant),dtype=int)
-            vism=np.zeros((2*nbl,1),dtype=np.complex128)
-            wt=np.zeros((2*nbl,2*nbl),dtype=np.complex128)
+            vism=np.zeros((2*nbl,1),dtype=complex)
+            wt=np.zeros((2*nbl,2*nbl),dtype=complex)
 
             #print(time)
             #thistime=(vdata['axis_info']['time_axis']['MJDseconds']==ainfo['timestamp'][j])
@@ -730,10 +730,10 @@ for s in range(4):
             amp_all1[k,0,t_step,s]=abs(vis_all[str(t_step)+corr+itstr+spwstr][k])
             if k==refant: 
                 phase_all1[k,0,t_step,s]=0
-            elif k<refant:
+            else:
                 phase_all1[k,0,t_step,s]=np.angle(vis_all[str(t_step)+corr+itstr+spwstr][k])
-            elif k>refant:
-                phase_all1[k,0,t_step,s]=np.angle(vis_all[str(t_step)+corr+itstr+spwstr][k-1])
+            #elif k>refant:
+            #    phase_all1[k,0,t_step,s]=np.angle(vis_all[str(t_step)+corr+itstr+spwstr][k-1])
 
 #phase_arr=gf.nonan(phase_all1)
 #amp_arr=gf.nonan(amp_all1)
