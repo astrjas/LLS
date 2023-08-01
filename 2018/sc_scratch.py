@@ -13,13 +13,18 @@ from math import e
 import pickle
 import math
 
-outies='DA43,DA52,DA54,DA59,DV09,DV13,DV16,DV17,DV20,DV22,DV24,PM01,PM02,PM03,PM04'
+#outies='DA43,DA52,DA54,DA59,DV09,DV13,DV16,DV17,DV20,DV22,DV24,PM01,PM02,PM03,PM04'
+exclAnts='DA43,DA52,DA54,DA59,DA65,DV09,DV10,DV20,DV24,PM01,PM02,PM03'
+boundscan=[46,78,101,133,138,167,193,215,238,267,272,304,328,345,349,381,386,408,434,460,465,484,538,563,586,606,613,645,650,680]
+bblocks=['46~78','101~133','138~167','193~215','238~267','272~304','328~345','349~381','386~408','434~460','465~484','538~563','586~606','613~645','650~680']
+
 #DA43,DV17,DV09,DV22,DV24,DV20,DA63,PM01,PM02,PM03,PM04,DA52,DV04,DA48,DA65,DA54,DV16,DA59
 #DA43,DA52,DA54,DA59,DV09,DV16,DV17,DV20,DV22,DV24,PM01,PM02,PM03,PM04
 
 attn=0
 tavg='60s'
 tavgint=60.
+#MJDdate=58233.00000000*3600.*24. #apr252018
 #MJDdate=58232.00000000*3600.*24. #apr242018
 #MJDdate=58230.00000000*3600.*24. #apr222018
 MJDdate=58229.00000000*3600.*24. #apr212018
@@ -53,7 +58,7 @@ case='innie'
 auth='Jasmin'
 #refmeth='ref35'
 refmeth='refDV07'
-date='07252023_'+str(attn)
+date='07272023_'+str(attn)
 refant=5
 rfname='DA47'
 
@@ -81,15 +86,15 @@ fullvis='sgr_apr21_XXYY.ms'
 #datams_noavg='sgr_apr24_cal_60s.ms'
 #datams_noavg='sgr_apr24_rmt_60s.ms'
 #datams_noavg=vis60
-datams_noavg=fullvis
+#datams_noavg=fullvis
 #datams0='sgr_apr24_final_XXYY_rdata_avg60s.ms'
 
 
-dmsprefix=datams_noavg[:9]
+dmsprefix=fullvis[:9]
 
 rdavg=dmsprefix+'_noflag.ms'
 os.system('rm -rf '+rdavg+' '+rdavg+'.flagversions')
-split(vis=datams_noavg,
+split(vis=fullvis,
       outputvis=rdavg,
       #timebin=tavg,
       #combine='state,scan',
@@ -98,18 +103,17 @@ split(vis=datams_noavg,
       datacolumn='data',keepflags=False)
 clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
 
-datams0=rdavg
-
 #Setting name of file for time-averaged split file
-resavg=dmsprefix+'_avgresres.ms'
+#resavg=dmsprefix+'_avgresres.ms'
 
-rawdata=datams0
-clearcal(vis=rawdata,spw='0,1,2,3',addmodel=True)
-flagdata(vis=rawdata,scan='527')
+#rawdata=rdavg
+clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
+flagdata(vis=rdavg,scan='9~41,345,527')#9~41
+flagdata(vis=rdavg,antenna='DA61,DV21')
 
 rawsplit=dmsprefix+'_rawsplit.ms'
 os.system('rm -rf '+rawsplit+' '+rawsplit+'.flagversions')
-split(vis=datams0,
+split(vis=rdavg,
       outputvis=rawsplit,
       #timebin='0s',
       #combine='scan,state',
@@ -135,83 +139,83 @@ os.system('rm -rf '+dmsprefix+'_selfcal*_mod_it*.ms')
 os.system('rm -rf '+dmsprefix+'_selfcal*_ext2_it*.ms')
 
 
-clearcal(vis=datams0,spw='0,1,2,3',addmodel=True)
+clearcal(vis=rawsplit,spw='0,1,2,3',addmodel=True)
 
-tbdata={}
-tb.open(datams0)
-tbdata['data']=tb.getcol('DATA')
-tbdata['data']=np.squeeze(tbdata['data'])
-tbdata['flag']=tb.getcol('FLAG')
-tbdata['flag']=np.squeeze(tbdata['flag'])
-tbdata['time']=tb.getcol('TIME')
-tbdata['antenna1']=tb.getcol('ANTENNA1')
-tbdata['antenna2']=tb.getcol('ANTENNA2')
-tbdata['sigma']=tb.getcol('SIGMA')
-tb.close()
+#tbdata={}
+#tb.open(rawsplit)
+#tbdata['data']=tb.getcol('DATA')
+#tbdata['data']=np.squeeze(tbdata['data'])
+#tbdata['flag']=tb.getcol('FLAG')
+#tbdata['flag']=np.squeeze(tbdata['flag'])
+#tbdata['time']=tb.getcol('TIME')
+#tbdata['antenna1']=tb.getcol('ANTENNA1')
+#tbdata['antenna2']=tb.getcol('ANTENNA2')
+#tbdata['sigma']=tb.getcol('SIGMA')
+#tb.close()
 
-ms.open(rawsplit,nomodify=True)
-visdata = ms.getdata(['axis_info'],ifraxis=True)
-#visdata['data'] = np.squeeze(visdata['data'])
-ms.close()
+#ms.open(rawsplit,nomodify=True)
+#visdata = ms.getdata(['axis_info'],ifraxis=True)
+##visdata['data'] = np.squeeze(visdata['data'])
+#ms.close()
 
 
-allants=np.concatenate((tbdata['antenna1'],tbdata['antenna2']))
-antlist=np.unique(allants)
+#allants=np.concatenate((tbdata['antenna1'],tbdata['antenna2']))
+#antlist=np.unique(allants)
 
-print(antlist)
+#print(antlist)
 
 #Number of polarizations
-npol=tbdata['data'].shape[0]
-polnames=visdata['axis_info']['corr_axis']
+#npol=tbdata['data'].shape[0]
+#polnames=visdata['axis_info']['corr_axis']
 
 
 #Calculating number of antennas and baselines
-nant=int(len(antlist))
-nbl=int(nant*(nant-1)/2)
-ntimes=len(np.unique(tbdata['time']))
+#nant=int(len(antlist))
+#nbl=int(nant*(nant-1)/2)
+#ntimes=len(np.unique(tbdata['time']))
 
-tt=np.array(np.unique(tbdata['time']))
+#tt=np.array(np.unique(tbdata['time']))
 
 
-print(nant)
-print(nbl)
+#print(nant)
+#print(nbl)
 
-ELO=np.unique(tbdata['time'])
+#ELO=np.unique(tbdata['time'])
 
 
 #Setting initial data file for analysis
 datams1=rawsplit
 
-resresdict={}
+#resresdict={}
 
 #Calculating RMS of data for CLEAN threshold
 #ms.open(datams1,nomodify=True)
 #ms.open(datams0,nomodify=True)
 #sigs=ms.getdata(['sigma'])
 #fsigs=np.asarray(sigs['sigma']).flatten()
-fsigs=tbdata['sigma']
-print('Fsig shape:',fsigs.shape)
-invsigs=1./(fsigs*fsigs)
-sumsigs=np.sum(invsigs)
-rmst=2.*np.sqrt(1./sumsigs)
-print('RMS: %e' %(rmst))
+#fsigs=tbdata['sigma']
+#print('Fsig shape:',fsigs.shape)
+#invsigs=1./(fsigs*fsigs)
+#sumsigs=np.sum(invsigs)
+#rmst=2.*np.sqrt(1./sumsigs)
+#print('RMS: %e' %(rmst))
 #ms.close()
 
 
 
 #Creating and initializing data file to store UVMULTIFIT pt source flux
-g=open('uvmflux_'+target+'.txt','w')
-g.write('it scan ext mod moderr\n')
+#g=open('uvmflux_'+target+'.txt','w')
+#g.write('it scan ext mod moderr\n')
 
-q=open('nv_'+target+'.txt','w')
-q.write('')
+#q=open('nv_'+target+'.txt','w')
+#q.write('')
 
 
 
 #Start with first iteration
 it=0
 
-iref=np.where(antlist==refant)[0][0]
+#iref=np.where(antlist==refant)[0][0]
 
 #scandict={}
 
@@ -354,10 +358,9 @@ split(vis=datams1,outputvis=dms_selfcal_copy,datacolumn='corrected',keepflags=Fa
 #scode=r2c['stopcode']
 
 #Set new dataset for next iteration
-datams0=dms_selfcal_copy
-rawdata=dms_selfcal
-datams1=rawdata
-clearcal(vis=datams1,spw='0,1,2,3',addmodel=True)
+#datams0=dms_selfcal_copy
+#rawdata=dms_selfcal
+datams1=dms_selfcal
 clearcal(vis=datams1,spw='0,1,2,3',addmodel=True)
     
 
@@ -385,8 +388,7 @@ tclean(vis=datams1,
 #### STEP 6 ####
 ################
 
-slint='inf'
-cin='spw'
+
 imax=imstat(imagename=imname2+'.image')['max'][0]
 thr=imax/15.
 
@@ -420,6 +422,8 @@ tclean(vis=datams1,
 ################
 
 calname='pt1cal_'+target+'_it'+str(it)+'.cal'
+slint='inf'
+cin='spw'
 
 os.system('rm -rf '+calname+'*')
 gaincal(vis=datams1,
@@ -499,24 +503,24 @@ split(vis=datams1,outputvis=dms_selfcal_copy,datacolumn='corrected',keepflags=Fa
 
 #Set new dataset for next iteration
 datams0=dms_selfcal_copy
-rawdata=dms_selfcal
-datams1=rawdata
+#rawdata=dms_selfcal
+datams1=dms_selfcal
 clearcal(vis=datams1,spw='0,1,2,3',addmodel=True)
-#clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
+##clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
 
-tb.open(datams1,nomodify=True)
-scan = tb.getcol('SCAN_NUMBER')
-fg = tb.getcol('FLAG')
+#tb.open(datams1,nomodify=True)
+#scan = tb.getcol('SCAN_NUMBER')
+#fg = tb.getcol('FLAG')
 #Creating array to store residuals
-visdata0 = tb.getcol('DATA')
-resres=np.zeros_like(visdata0)
-tb.close()
+#visdata0 = tb.getcol('DATA')
+#resres=np.zeros_like(visdata0)
+#tb.close()
 
 #Print scan numbers for edification
-scan = np.unique(scan)
-#scandict.update(key='scanit'+str(it),value=scan)
+#scan = np.unique(scan)
+##scandict.update(key='scanit'+str(it),value=scan)
 
-q.write('ITERATION '+str(it)+'\n')
+#q.write('ITERATION '+str(it)+'\n')
 
 #Declaring empty arrays for mod UVM flux and error
 muvmf=np.array([])
@@ -546,6 +550,7 @@ clearcal(vis=datams_mod,addmodel=True)
 
 tb.open(datams1)
 scans1 = tb.getcol('SCAN_NUMBER')
+scan = np.unique(scans1)
 field = tb.getcol('FIELD_ID')
 tb.close()
 cdn = field == 0 # here 0 is the field ID of the calibrator
@@ -556,8 +561,30 @@ targetScans = np.sort(np.unique(scans1[cdn]))
 #badScans = np.sort( np.append(targetScans[cdn], targetScans[endcap]) ) # the second array inside append is to select second scan from agroup
 #badscan  = [b for b in badScans if b in targetScans]
 
-badscan=[9,41,46,78,101,133,138,167,193,215,238,267,272,304,328,345,349,381,386,408,434,460,465,484,538,563,586,606,613,645,650,680]
+#9,41
 
+i=0
+bblock=[]
+while i<(len(boundscan)-1):
+    if i<(len(boundscan)-2):
+        ecap=boundscan[i+2]
+        e=boundscan[i]
+        while e<ecap:
+            pscans=range(e,e+4)
+            block=list([b for b in pscans if b in targetScans and b<ecap])
+            if len(block)>0: bblock.append(block)
+            e+=4
+    else: 
+        ecap=boundscan[-1]
+        e=boundscan[i]
+        while e<ecap:
+            pscans=range(e,e+4)
+            block=list([b for b in pscans if b in targetScans])
+            if len(block)>0: bblock.append(block)
+            e+=4
+    i+=2
+
+'''
 i=0
 bblock=[]
 while i<(len(badscan)-1):
@@ -568,6 +595,7 @@ while i<(len(badscan)-1):
     #print(block)
     bblock.append(block)
     i+=2
+'''
 
 
 #################
@@ -602,6 +630,7 @@ for s in scan:
                 spw='0,1,2,3',
                 #scans=[[sc]], 
                 scans=[sc],
+                #scans=[b],
                 model=['delta'],
                 var=['0,0,p[0]'], 
                 p_ini=[0.], 
@@ -700,7 +729,7 @@ clearcal(vis=datams_ext3,spw='0,1,2,3',addmodel=True)
 #### STEPS 14-18 ####
 #####################
 
-bblocks=['9~41','46~78','101~133','138~167','193~215','238~267','272~304','328~345','349~381','386~408','434~460','465~484','538~563','586~606','613~645','650~680']
+#9~41
 #ctstore=[]
 for b in range(len(bblocks)):
     dataseg='mnspblock'+str(b)+'.ms'
@@ -820,6 +849,21 @@ tclean(vis=datams_ext3,
        interactive=1,
        cell='0.2arcsec')
 
+#Imaging gain-calibrated data
+imname2=dmsprefix+'_it'+'{0:02d}'.format(it)+'_fullpostsc'
+os.system('rm -rf '+imname2+'.*')
+tclean(vis=datams1,
+       spw='',
+       imagename=imname2,
+       #spw='0,1,2,3',
+       field='0',
+       datacolumn='corrected',
+       niter=0,
+       pblimit=-1,
+       imsize=[300,300],
+       cell='0.2arcsec',
+       interactive=False)
+
 
 #Split again so gain-calibrated data and residuals are the data
 dms_selfcal=dmsprefix+'_selfcal_it'+str(it)+'.ms'
@@ -841,31 +885,28 @@ os.system('rm -rf '+dm3_selfcal+' '+dm3_selfcalf)
 split(vis=datams_ext3,outputvis=dm3_selfcal,datacolumn='corrected',keepflags=False)
 
 
+
+#Set new dataset for next iteration
+datams0=dms_selfcal_copy
+#rawdata=dms_selfcal
+datams1=dms_selfcal
+clearcal(vis=datams1,spw='0,1,2,3',addmodel=True)
+#clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
+
+
+
 #Seeing why TCLEAN ended
 #scode=r2c['stopcode']
 
 #Pulling (not) gain-calibrated residuals to add to previous iterations
-tb.open(datams_ext3)
-resids=tb.getcol('DATA')
-tb.close()
-resres=resids
-resresdict.update({'it'+str(it):resres})
+#tb.open(datams_ext3)
+#resids=tb.getcol('DATA')
+#tb.close()
+#resres=resids
+#resresdict.update({'it'+str(it):resres})
 
 
-#Imaging gain-calibrated data
-imname2=dmsprefix+'_it'+'{0:02d}'.format(it)+'_fullpostsc'
-os.system('rm -rf '+imname2+'.*')
-tclean(vis=datams1,
-       spw='',
-       imagename=imname2,
-       #spw='0,1,2,3',
-       field='0',
-       datacolumn='corrected',
-       niter=0,
-       pblimit=-1,
-       imsize=[300,300],
-       cell='0.2arcsec',
-       interactive=False)    
+    
 
 '''
 applycal(vis=datams1,
@@ -909,15 +950,6 @@ rawdata1=dms_selfcal1
 datams11=rawdata1
 clearcal(vis=datams11,spw='0,1,2,3',addmodel=True)
 '''
-
-
-#Set new dataset for next iteration
-datams0=dms_selfcal_copy
-rawdata=dms_selfcal
-datams1=rawdata
-clearcal(vis=datams1,spw='0,1,2,3',addmodel=True)
-#clearcal(vis=rdavg,spw='0,1,2,3',addmodel=True)
-
 
 
 #V_s*G
@@ -1014,7 +1046,7 @@ plt.savefig('./curves/'+target+'_lc_Jasmin_presc_'+date+'.png',format='png',over
 #### STEPS 20-24 ####
 #####################
 
-bblocks=['9~41','46~78','101~133','138~167','193~215','238~267','272~304','328~345','349~381','386~408','434~460','465~484','538~563','586~606','613~645','650~680']
+#bblocks=['9~41','46~78','101~133','138~167','193~215','238~267','272~304','328~345','349~381','386~408','434~460','465~484','538~563','586~606','613~645','650~680']
 ctstore=[]
 for b in range(len(bblocks)):
     dataseg='block'+str(b)+'.ms'
@@ -1079,7 +1111,7 @@ for b in range(len(bblocks)):
         calmode='a',
         refant=rfname,
         #uvrange='>50m',
-        antenna='DA43,DA52,DA54,DA59,DA65,DV09,DV10,DV20,DV24,PM01,PM02,PM03',
+        antenna=exclAnts,
         #refantmode='strict',
         gaintype='T',
         combine=cin,
@@ -1104,7 +1136,7 @@ for b in range(len(bblocks)):
              field='0',
              spwmap=[0,0,0,0],
              gaintable=calname,
-             antenna='DA43,DA52,DA54,DA59,DA65,DV09,DV10,DV20,DV24,PM01,PM02,PM03',
+             antenna=exclAnts,
              applymode='calonly',
              #uvrange='<50m',
              flagbackup=True)
@@ -1149,7 +1181,7 @@ clearcal(datams13,spw='0,1,2,3')
 #### STEPS 25-29 ####
 #####################
 
-bblocks=['9~41','46~78','101~133','138~167','193~215','238~267','272~304','328~345','349~381','386~408','434~460','465~484','538~563','586~606','613~645','650~680']
+#bblocks=['9~41','46~78','101~133','138~167','193~215','238~267','272~304','328~345','349~381','386~408','434~460','465~484','538~563','586~606','613~645','650~680']
 ctstore=[]
 for b in range(len(bblocks)):
     dataseg='block'+str(b)+'_1.ms'
@@ -1404,7 +1436,7 @@ ax2.set_ylabel('Error', color='orange')  # we already handled the x-label with a
 ax2.tick_params(axis='y', labelcolor='orange')
 ax1.legend()
 #fig.tight_layout()  # otherwise the right y-label is slightly clipped
-
+plt.minorticks_on()
 
 #plt.title('Sgr A* - April 24')
 #plt.xlabel('Hours since 0:00 UTC')
